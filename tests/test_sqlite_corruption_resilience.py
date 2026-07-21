@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for SQLite corruption resilience (P0) and virtiofs detection (P1)."""
 
+import platform
 import sqlite3
 import subprocess
 from unittest.mock import patch
@@ -201,6 +202,10 @@ class TestVirtiofsDetection:
     def test_memory_db_is_not_virtiofs(self):
         assert _is_virtiofs(":memory:") is False
 
+    @pytest.mark.skipif(
+        platform.system() != "Linux",
+        reason="virtiofs detection is a Linux-only code path",
+    )
     @patch("subprocess.run")
     def test_detects_virtiofs_in_df_output(self, mock_run):
         mock_run.return_value = type(
