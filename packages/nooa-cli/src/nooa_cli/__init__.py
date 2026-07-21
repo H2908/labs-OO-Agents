@@ -34,7 +34,7 @@ _SKIP_SECRETS_PRELOAD = {"term", "completion"}
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.version_option(package_name="nemo-labs-oo-agents-cli")
+@click.version_option(package_name="nooa-cli")
 @click.pass_context
 def oo(ctx):
     """OO Agents — agent toolkit.

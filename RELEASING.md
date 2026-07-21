@@ -1,6 +1,6 @@
 # Releasing nemo-oo-agents
 
-Three workspace packages — `nemo-oo-agents`, `nemo-labs-oo-agents-cli`, and
+Three workspace packages — `nemo-oo-agents`, `nooa-cli`, and
 `nemo-oo-agents-benchmarks` — release together from the same git commit.
 Version is derived from `git describe` at build time by
 [`uv-dynamic-versioning`](https://github.com/ninoseki/uv-dynamic-versioning).
@@ -81,7 +81,7 @@ The wheel ships as `0.3.0-rc1` (PEP 440 normalizes to `0.3.0rc1`).
 
 ## Cross-package dependencies
 
-`nemo-labs-oo-agents-cli` and `nemo-oo-agents-benchmarks` declare their
+`nooa-cli` and `nemo-oo-agents-benchmarks` declare their
 dependency on core as a static lower-bound floor in their pyproject.toml:
 
 ```toml

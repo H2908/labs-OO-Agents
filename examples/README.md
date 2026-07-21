@@ -476,7 +476,7 @@ uv run python examples/quickstart/10_skills.py
 
 ### MCP tools
 
-MCP (Model Context Protocol) tools let your agent call external services through a standard interface. The TUI ships MCP as a hard dependency (`self.mcp` and `/mcp` are always available). In the core library, MCP is an optional extra (`uv add 'nemo-labs-oo-agents[mcp]'`).
+MCP (Model Context Protocol) tools let your agent call external services through a standard interface. The TUI ships MCP as a hard dependency (`self.mcp` and `/mcp` are always available). In the core library, MCP is an optional extra (`uv add 'nooa[mcp]'`).
 
 **TUI configuration** — declare MCP servers in `.nooa/settings.yaml`:
 
@@ -540,7 +540,7 @@ uv run python examples/quickstart/11_mcp.py
 Run agents in isolated, ephemeral compute environments. Install the `sandbox` extra:
 
 ```bash
-uv add 'nemo-labs-oo-agents[sandbox]'
+uv add 'nooa[sandbox]'
 openshell gateway start           # see https://github.com/NVIDIA/OpenShell
 ```
 

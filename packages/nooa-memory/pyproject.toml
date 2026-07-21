@@ -1,12 +1,12 @@
 [project]
-name = "nemo-labs-oo-agents-memory"
+name = "nooa-memory"
 # Version is derived from git tags at build time by uv-dynamic-versioning.
 dynamic = ["version"]
 description = "Long-term memory system for nooa agents (ships with the ARC-AGI-3 example; not yet published)"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.12,<3.14"
 dependencies = [
-    "nemo-labs-oo-agents>=0.2.0",
+    "nooa>=0.2.0",
     "pydantic>=2.5.0",
     "numpy>=1.24.0",
 ]
@@ -20,7 +20,7 @@ dependencies = [
 "nemo.memory" = "nooa_memory.memory_skill:MemorySkill"
 
 [tool.uv.sources]
-nemo-labs-oo-agents = { workspace = true }
+nooa = { workspace = true }
 
 [build-system]
 requires = ["hatchling>=1.26.0", "uv-dynamic-versioning>=0.14.0"]

@@ -1,5 +1,5 @@
 [project]
-name = "nemo-labs-oo-agents-cli"
+name = "nooa-cli"
 # Version is derived from git tags at build time by uv-dynamic-versioning.
 dynamic = ["version"]
 description = "CLI and TUI for nemo-oo-agents (`nooa` command, web terminal, agent REPL)"
@@ -10,7 +10,7 @@ dependencies = [
     # Floor reflects the actual minimum-compatible core (bump when the cli
     # starts to require a newer core API). No auto-lockstep — published
     # wheels declare what they actually need, not what was co-released.
-    "nemo-labs-oo-agents>=0.2.0",
+    "nooa>=0.2.0",
     "click>=8.1.0",
     "ipython>=9.12.0",
     # prompt-toolkit and rich were only transitive (via ipython and litellm
@@ -62,14 +62,14 @@ datascience = [
 # the data-science stack so the LLM has the same REPL capabilities as
 # in the local terminal.
 web = [
-    "nemo-labs-oo-agents-cli[datascience]",
+    "nooa-cli[datascience]",
     "uvicorn[standard]>=0.34.0",
     "ptyprocess>=0.7.0",
     "fastapi>=0.123.4",
 ]
 
 [tool.uv.sources]
-nemo-labs-oo-agents = { workspace = true }
+nooa = { workspace = true }
 
 [build-system]
 requires = ["hatchling>=1.26.0", "uv-dynamic-versioning>=0.14.0"]
