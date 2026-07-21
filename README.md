@@ -2,7 +2,9 @@
 
 <br />
 
-# NVIDIA Object Oriented Agents
+<h1 align="center">NVIDIA Object Oriented Agents</h1>
+
+<h3 align="center">The most Pythonic way to build AI agents.</h3>
 
 [![nemo-labs | NVIDIA](https://img.shields.io/badge/nemo--labs-NVIDIA-76B900)](https://www.nvidia.com/)
 [![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](PAPER_URL)
