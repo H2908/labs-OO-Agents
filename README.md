@@ -173,7 +173,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 ## Citation
 
-If you use NeMo OO Agents in your research, please cite:
+If you use NVIDIA OO Agents in your research, please cite:
 
 ```bibtex
 @techreport{nvidia_oo_agents_2026,
