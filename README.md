@@ -2,7 +2,7 @@
 
 <br />
 
-<h1 align="center">NVIDIA Object Oriented Agents</h1>
+<h1 align="center">NVIDIA-labs Object Oriented Agents</h1>
 
 <h3 align="center">The most Pythonic way to build AI agents.</h3>
 
@@ -179,11 +179,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 ## Citation
 
-If you use NVIDIA OO Agents in your research, please cite:
+If you use NVIDIA-labs OO Agents in your research, please cite:
 
 ```bibtex
 @techreport{nvidia_oo_agents_2026,
-  title  = {NVIDIA OO Agents: Native Python Object-Oriented Agents},
+  title  = {NVIDIA-labs OO Agents: Native Python Object-Oriented Agents},
   author = {Furgale, Paul and Klingler, Severin and Nolan, James and Staats, Matt and
             Di Lorenzo, Gaia and Martinez Abad, Elisa and Schueler, Christian and
             Dinu, Razvan and Devoto, Alessio and Berard, Pascal and Kaplun, Gal and Sarafian, Elad and
