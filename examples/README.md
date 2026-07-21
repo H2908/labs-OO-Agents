@@ -476,32 +476,7 @@ uv run python examples/quickstart/10_skills.py
 
 ### MCP tools
 
-MCP (Model Context Protocol) tools let your agent call external services through a standard interface. The TUI ships MCP as a hard dependency (`self.mcp` and `/mcp` are always available). In the core library, MCP is an optional extra (`uv add 'nooa[mcp]'`).
-
-**TUI configuration** — declare MCP servers in `.nooa/settings.yaml`:
-
-```yaml
-tui:
-  mcp_auto_connect: ["maas-confluence-stg"]
-  mcp_servers:
-    maas-confluence-stg:
-      url: "https://your-mcp-server.example.com/mcp"
-      transport: "streamable-http"
-      headers:
-        Authorization: "Bearer ${MAAS_API_KEY}"
-```
-
-At startup the TUI attaches auto-connected servers to the agent, so `maas-confluence-stg` becomes `self.maas_confluence_stg`. A VS Code / Claude-style `.mcp.json` file is also supported via `mcp_file` or `--mcp-file`.
-
-Inside the TUI, servers are managed through `self.mcp` (an `MCPRegistry` skill that mirrors `self.skills`):
-
-- `self.mcp.discovered()` — configured server names
-- `await self.mcp.connect(["name"])` — open a server and attach it as `self.<name>`
-- `self.mcp.activate([...])` / `self.mcp.deactivate([...])` — control whether a connected server's tools are listed for the agent
-- `<mcp>` context block lists every server each turn under **Active**, **Connected but inactive**, or **Configured**
-- Slash commands: `/mcp list`, `/mcp connect <server>`, `/mcp disconnect <server>`
-
-**Library use** — no `self.mcp`; call the stateless `MCPManager` factory directly:
+MCP (Model Context Protocol) tools let your agent call external services through a standard interface. Install with `uv add 'nooa[mcp]'` and call the stateless `MCPManager` factory:
 
 ```python
 from nooa.mcp import MCPManager

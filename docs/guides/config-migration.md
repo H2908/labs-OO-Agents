@@ -18,60 +18,7 @@ wins). Here's everything you need to move.
 
 `NAT_CONFIG_DIR` is gone — use `NEMO_OO_USER_DIR` to relocate the user dir.
 
-## 2. TUI settings: `config.toml` → `settings.yaml`
-
-Project-only TOML becomes layered YAML (`<project>/.nooa/settings.yaml` or
-user-global `~/.config/nooa/settings.yaml`). **Hard switch — `config.toml`
-is no longer read.**
-
-**Before — `config.toml`**
-```toml
-[tui]
-model = "claude-opus-4-8"
-python = false
-vi = false
-trace = ".nooa/traces"
-mcp_auto_connect = ["maas"]
-
-[tui.mcp_servers.maas]
-url = "https://your-mcp-server.example.com/mcp"
-transport = "streamable-http"
-
-[tui.mcp_servers.maas.headers]
-Authorization = "Bearer ${MAAS_API_KEY}"
-```
-
-**After — `settings.yaml`**
-```yaml
-tui:
-  default_model: claude-opus-4-8
-  show_python: false
-  vi_mode: false
-  trace_dir: .nooa/traces
-  mcp_auto_connect: [maas]
-  mcp_servers:
-    maas:
-      url: https://your-mcp-server.example.com/mcp
-      transport: streamable-http
-      headers:
-        Authorization: "Bearer ${MAAS_API_KEY}"
-```
-
-Key renames (YAML uses the real field names):
-
-| `config.toml` | `settings.yaml` |
-|---------------|-----------------|
-| `[tui]` table | `tui:` mapping |
-| `model` | `default_model` |
-| `python` | `show_python` |
-| `vi` | `vi_mode` |
-| `trace` | `trace_dir` |
-| `libs_dirs`, `mcp_auto_connect` | *(unchanged)* |
-| `[tui.mcp_servers.<name>]` | `tui.mcp_servers.<name>:` |
-
-(`/config set model …` still works — friendly keys map to the field names.)
-
-## 3. API keys / secrets
+## 2. API keys / secrets
 
 | Before | After |
 |--------|-------|
@@ -88,14 +35,14 @@ A shell `export` still wins (non-clobber), so existing exports keep working —
 `secrets.yaml` just means you no longer *need* one. The installer writes this
 file for you.
 
-## 4. LLM aliases: `llm_config.yaml`
+## 3. LLM aliases: `llm_config.yaml`
 
 Same filename and format — just move it to the new dir:
 `~/.config/nat/oo/llm_config.yaml` → `~/.config/nooa/llm_config.yaml`
 (or `<project>/.nooa/llm_config.yaml`). `nooa config eject` regenerates
 a fresh copy in the new location.
 
-## 5. Environment variables → `NEMO_OO_` prefix
+## 4. Environment variables → `NEMO_OO_` prefix
 
 | Before | After |
 |--------|-------|

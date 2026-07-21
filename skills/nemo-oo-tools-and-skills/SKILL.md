@@ -72,7 +72,7 @@ class MyAgent(Agent, llm=llm):
 - `TextSkill` exposes `read_file(path)` and `await run_script(name, *args)` for files/scripts bundled with the SKILL.md.
 - SKILL.md frontmatter: required `name`, `description`; optional `compatibility`, `metadata`, `user-invocable`, `allowed-tools` — Claude-Code-compatible format.
 - Bulk discovery/activation is `SkillRegistry(agent)` + `discover_skills_dirs([...])` / `activate([...])`. **`SkillManager` does not exist** — `README`/`examples/quickstart/10_skills.py` referencing `SkillManager.install(...)` are stale.
-- `@slash_command` on a `Skill` method marks it user-invocable in the TUI.
+- `@slash_command` on a `Skill` method marks it user-invocable via a host that reads the agent's `slash_commands` queue (see `InteractiveAgent`).
 - Docstring conventions and the full guide: `docs/skills-guide.md`.
 
 ## MCP servers
@@ -93,7 +93,7 @@ class ConfluenceAgent(Agent, llm=llm):
         ...
 ```
 
-MCP tools appear alongside regular methods — the LLM calls them like any other attribute. Servers are configured in `.mcp.json` (VS Code/Claude Code format); in the TUI they instead live in `.nooa/config.toml` under `[tui.mcp_servers.*]` with `self.mcp` (an `MCPRegistry`) managing connect/activate. Transports: stdio, SSE, streamable-http; OAuth supported (`nooa.mcp.OAuthConfig`).
+MCP tools appear alongside regular methods — the LLM calls them like any other attribute. Servers are configured in `.mcp.json` (VS Code/Claude Code format). Transports: stdio, SSE, streamable-http; OAuth supported (`nooa.mcp.OAuthConfig`).
 
 ## Multimodal media
 
