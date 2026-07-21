@@ -10,7 +10,7 @@ dependencies = [
     # Floor reflects the actual minimum-compatible core (bump when the cli
     # starts to require a newer core API). No auto-lockstep — published
     # wheels declare what they actually need, not what was co-released.
-    "nooa>=0.2.0",
+    "nooa",
     "click>=8.1.0",
     "ipython>=9.12.0",
     # prompt-toolkit and rich were only transitive (via ipython and litellm
@@ -88,5 +88,3 @@ fallback-version = "0.2.0"
 [tool.hatch.build.targets.wheel]
 packages = ["src/nooa_cli"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"../../THIRD_PARTY_NOTICES.md" = "THIRD_PARTY_NOTICES.md"

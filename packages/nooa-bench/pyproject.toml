@@ -6,8 +6,8 @@ description = "Benchmark agent (BenchAgent) and Harbor runner for the NOOA frame
 license = {text = "Apache-2.0"}
 requires-python = ">=3.12"
 dependencies = [
-    "nooa>=0.2.0",
-    "nooa-cli>=0.2.0",
+    "nooa",
+    "nooa-cli",
     "click>=8.1",
 ]
 
