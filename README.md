@@ -180,8 +180,8 @@ If you use NeMo OO Agents in your research, please cite:
   title  = {Nemo OO Agents: Native Python Object-Oriented Agents},
   author = {Furgale, Paul and Klingler, Severin and Nolan, James and Staats, Matt and
             Di Lorenzo, Gaia and Martinez Abad, Elisa and Schueler, Christian and
-            Dinu, Razvan and Devoto, Alessio and Berard, Pascal and Kaplun, Gal and Sarafian, Elad
-Roveri, Riccardo and Derczynski, Leon and Silveira Cabral, Ricardo},
+            Dinu, Razvan and Devoto, Alessio and Berard, Pascal and Kaplun, Gal and Sarafian, Elad and
+            Roveri, Riccardo and Derczynski, Leon and Silveira Cabral, Ricardo},
   year   = {2026},
 }
 ```
