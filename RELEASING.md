@@ -20,7 +20,7 @@ the commit, plus the distance to that tag:
 | 5 commits past `v0.3.0` | `0.3.1.dev5` |
 | No `vX.Y.Z` tag reachable yet | `0.0.1.dev<commit-count>` (until first tag — see "Bootstrapping") |
 
-> Note: the `fallback-version = "0.2.0"` in pyproject.toml is the version
+> Note: the `fallback-version = "0.0.6"` in pyproject.toml is the version
 > used only when git itself is unavailable (e.g. building from an unpacked
 > sdist with no `.git` dir). In CI git is always present, so the version
 > is always derived from `git describe` — the fallback never fires.
