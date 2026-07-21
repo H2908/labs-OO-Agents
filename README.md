@@ -176,8 +176,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 If you use NeMo OO Agents in your research, please cite:
 
 ```bibtex
-@techreport{nemo_oo_agents_2026,
-  title  = {Nemo OO Agents: Native Python Object-Oriented Agents},
+@techreport{nvidia_oo_agents_2026,
+  title  = {NVIDIA OO Agents: Native Python Object-Oriented Agents},
   author = {Furgale, Paul and Klingler, Severin and Nolan, James and Staats, Matt and
             Di Lorenzo, Gaia and Martinez Abad, Elisa and Schueler, Christian and
             Dinu, Razvan and Devoto, Alessio and Berard, Pascal and Kaplun, Gal and Sarafian, Elad and
