@@ -4,6 +4,7 @@
 
 import asyncio
 import os
+import platform
 
 import pytest
 
@@ -73,6 +74,10 @@ class TestMonitorProcessIsolation:
         assert lines_a == ["A1", "A2"]
         assert lines_b == ["B1", "B2"]
 
+    @pytest.mark.skipif(
+        platform.system() != "Linux",
+        reason="process-group kill semantics differ on non-Linux; verified in Linux CI",
+    )
     async def test_monitor_cancel_kills_process_group(self):
         """Cancelling monitor must kill the entire process group, not just the shell."""
         gen = monitor("bash -c 'echo $BASHPID; sleep 999 & echo ready; wait'")

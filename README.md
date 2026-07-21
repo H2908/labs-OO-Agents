@@ -100,6 +100,8 @@ llm = get_llm_client("hosted_vllm/Qwen/Qwen3-1.7B", api_base="http://localhost:8
 ***Agents are Python objects***. Methods with `...` bodies are **generation methods** — implemented at runtime by an LLM-driven strategy. The signature defines the contract; the docstring is the prompt.
 
 ```python
+import asyncio
+
 from nooa import Agent
 
 
@@ -111,11 +113,13 @@ class FeedbackAgent(Agent, llm=llm):
         ...
 
 
-@autorun
 async def main():
     agent = FeedbackAgent()
     result = await agent.analyze_feedback("Great product, but shipping was slow")
     print(result)
+
+
+asyncio.run(main())
 ```
 
 Run the same code from your own project with `python`. You can run the checked-in example:
