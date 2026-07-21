@@ -6,7 +6,7 @@
 
 <h3 align="center">The most Pythonic way to build AI agents.</h3>
 
-[![nemo-labs | NVIDIA](https://img.shields.io/badge/nemo--labs-NVIDIA-76B900)](https://www.nvidia.com/)
+[![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
 [![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](PAPER_URL)
 [![Blog](https://img.shields.io/badge/blog-coming%20soon-lightgrey)](BLOG_URL)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
