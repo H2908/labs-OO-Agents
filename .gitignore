@@ -402,3 +402,6 @@ examples/memory_bench/data/
 
 # Local scratch/working files (never commit)
 .scratch/
+
+# Claude Code local session dir (never commit)
+.claude/
