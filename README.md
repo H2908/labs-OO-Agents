@@ -2,7 +2,7 @@
 
 <br />
 
-# NeMo Object Oriented Agents
+# NVIDIA Object Oriented Agents
 
 [![nemo-labs | NVIDIA](https://img.shields.io/badge/nemo--labs-NVIDIA-76B900)](https://www.nvidia.com/)
 [![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](PAPER_URL)
@@ -16,7 +16,7 @@
 </div>
 
 
-NeMo OO Agents (NOOA) is a model-agnostic Python framework for building reliable AI agents. Traditional agent frameworks scatter your code across prompt templates, tool schemas, callback handlers, and workflow graphs. NOOA collapses all of that into a single Python class:
+NVIDIA OO Agents (NOOA) is a model-agnostic Python framework for building reliable AI agents. Traditional agent frameworks scatter your code across prompt templates, tool schemas, callback handlers, and workflow graphs. NOOA collapses all of that into a single Python class:
 
 ```python
 from nooa import Agent
@@ -45,7 +45,7 @@ class SupportAgent(Agent):
 - **Code as action.** The model acts by writing Python in a Jupyter-style REPL with access to `self`, imports, and helpers — no bespoke tool schemas.
 - **Pythonic and agent-ready.** Typed I/O with auto-retry, live-object arguments passed by reference, and model-callable context and event APIs — designed for agents from the ground up.
 
-The result: agents you can test, trace, refactor, and version — **just like the rest of your software**. Read the paper for the design principles and evaluation results: [Nemo OO Agents: Native Python Object-Oriented Agents](PAPER_URL).
+The result: agents you can test, trace, refactor, and version — **just like the rest of your software**. Read the paper for the design principles and evaluation results: [NVIDIA OO Agents: Native Python Object-Oriented Agents](PAPER_URL).
 
 ## Installation
 
