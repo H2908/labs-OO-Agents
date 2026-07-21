@@ -24,13 +24,9 @@ from .completion import completion
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 
-# Thin launcher subcommands that don't touch API keys in *this* process:
-# `term` runs a web/PTY server and re-spawns the CLI as a child (which loads
-# secrets itself via bootstrap); `completion` just emits a shell script.
-# Skipping the secrets preload for them avoids importing the heavy
-# ``nooa`` core (~1.5s) on startup — keeping `nooa term` fast and
-# its SIGINT shutdown prompt.
-_SKIP_SECRETS_PRELOAD = {"term", "completion"}
+# `completion` just emits a shell script and doesn't need the ~1.5s core
+# import cost or secrets preload.
+_SKIP_SECRETS_PRELOAD = {"completion"}
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -45,10 +41,10 @@ def oo(ctx):
     if ctx.invoked_subcommand in _SKIP_SECRETS_PRELOAD:
         return
     # Load secrets.yaml into the process env before any subcommand runs so
-    # non-TUI commands (config show, eval, …) see the same API keys the TUI
-    # does. Non-clobbering (shell env wins) and best-effort: a broken or
-    # missing secrets file must never block the CLI — but log the failure at
-    # debug so it's recoverable rather than silently swallowed.
+    # all commands (config show, eval, …) see the same API keys.
+    # Non-clobbering (shell env wins) and best-effort: a broken or missing
+    # secrets file must never block the CLI — but log the failure at debug
+    # so it's recoverable rather than silently swallowed.
     try:
         from nooa.secrets import load_secrets_into_env
 

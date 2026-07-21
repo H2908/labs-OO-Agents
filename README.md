@@ -61,14 +61,14 @@ uv add "nooa @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main"
 ```
 
 <details>
-<summary><b>Optional sub-packages</b> — CLI + TUI, memory, evaluation pipeline</summary>
+<summary><b>Optional sub-packages</b> — CLI, memory, evaluation pipeline</summary>
 
 <br />
 
 All of these live in the same repo and are addressed with `#subdirectory=…`.
 
 ```bash
-# CLI + TUI (beta): the `nooa` command, agent REPL, trace viewer, TUI
+# CLI (beta): the `nooa` command, trace viewer, eval runner
 uv add "nooa-cli @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=packages/nooa-cli"
 
 # Long-term memory subsystem (MemoryManager)
