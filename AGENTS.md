@@ -206,6 +206,3 @@ See `docs/guides/writing-generation-methods.md` for more details.
 
 All experiments in `experiments/` **must** have a `README.md` covering: research question, experiment design, key metrics, how to run, and results summary (updated after runs with quantitative findings).
 
-## Reference Material
-
-For paths, examples, build commands, environment variables, and detailed guides, see [REFERENCE.md](REFERENCE.md).
