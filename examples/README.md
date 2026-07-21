@@ -485,7 +485,7 @@ tui:
   mcp_auto_connect: ["maas-confluence-stg"]
   mcp_servers:
     maas-confluence-stg:
-      url: "https://maas.stg.astra.nvidia.com/maas/confluence/mcp"
+      url: "https://your-mcp-server.example.com/mcp"
       transport: "streamable-http"
       headers:
         Authorization: "Bearer ${MAAS_API_KEY}"
@@ -523,7 +523,7 @@ Or inline the connection details:
 ```python
 confluence_tool = MCPManager.create_from_server(
     "maas-confluence-stg",
-    url="https://maas.stg.astra.nvidia.com/maas/confluence/mcp",
+    url="https://your-mcp-server.example.com/mcp",
     transport="streamable-http",
     headers={},
 )
