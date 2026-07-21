@@ -14,7 +14,7 @@ installed `.dist-info` metadata and source distributions for those packages.
 
 ---
 
-## `nemo-labs-oo-agents`
+## `nooa`
 
 httpx - BSD 3-Clause License
 Attribution Statements: NVIDIA includes `httpx` under the BSD 3-Clause License for use with NVIDIA OO Agents.
@@ -43,7 +43,7 @@ Source/Homepage: https://github.com/python-gitlab/python-gitlab
 
 ---
 
-## `nemo-labs-oo-agents-cli`
+## `nooa-cli`
 
 click - BSD 3-Clause License
 Attribution Statements: NVIDIA includes `click` under the BSD 3-Clause License for use with NVIDIA OO Agents.
@@ -60,8 +60,8 @@ Attribution Statements: NVIDIA includes `mcp` under the MIT License for use with
 License Text(https://spdx.org/licenses/MIT.html)
 Source/Homepage: https://github.com/modelcontextprotocol/python-sdk
 
-nemo-labs-oo-agents - Apache License 2.0
-Attribution Statements: NVIDIA includes `nemo-labs-oo-agents` under the Apache License 2.0 for use with NVIDIA OO Agents.
+nooa - Apache License 2.0
+Attribution Statements: NVIDIA includes `nooa` under the Apache License 2.0 for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/Apache-2.0.html)
 Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 
@@ -104,13 +104,13 @@ Attribution Statements: NVIDIA includes `mcp` under the MIT License for use with
 License Text(https://spdx.org/licenses/MIT.html)
 Source/Homepage: https://github.com/modelcontextprotocol/python-sdk
 
-nemo-labs-oo-agents - Apache License 2.0
-Attribution Statements: NVIDIA includes `nemo-labs-oo-agents` under the Apache License 2.0 for use with NVIDIA OO Agents.
+nooa - Apache License 2.0
+Attribution Statements: NVIDIA includes `nooa` under the Apache License 2.0 for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/Apache-2.0.html)
 Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 
-nemo-labs-oo-agents-cli - Apache License 2.0
-Attribution Statements: NVIDIA includes `nemo-labs-oo-agents-cli` under the Apache License 2.0 for use with NVIDIA OO Agents.
+nooa-cli - Apache License 2.0
+Attribution Statements: NVIDIA includes `nooa-cli` under the Apache License 2.0 for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/Apache-2.0.html)
 Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 
@@ -143,13 +143,13 @@ Attribution Statements: NVIDIA includes `click` under the BSD 3-Clause License f
 License Text(https://spdx.org/licenses/BSD-3-Clause.html)
 Source/Homepage: https://github.com/pallets/click
 
-nemo-labs-oo-agents - Apache License 2.0
-Attribution Statements: NVIDIA includes `nemo-labs-oo-agents` under the Apache License 2.0 for use with NVIDIA OO Agents.
+nooa - Apache License 2.0
+Attribution Statements: NVIDIA includes `nooa` under the Apache License 2.0 for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/Apache-2.0.html)
 Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 
-nemo-labs-oo-agents-cli - Apache License 2.0
-Attribution Statements: NVIDIA includes `nemo-labs-oo-agents-cli` under the Apache License 2.0 for use with NVIDIA OO Agents.
+nooa-cli - Apache License 2.0
+Attribution Statements: NVIDIA includes `nooa-cli` under the Apache License 2.0 for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/Apache-2.0.html)
 Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 
@@ -171,8 +171,8 @@ Attribution Statements: NVIDIA includes `fastapi` under the MIT License for use 
 License Text(https://spdx.org/licenses/MIT.html)
 Source/Homepage: https://github.com/fastapi/fastapi
 
-nemo-labs-oo-agents - Apache License 2.0
-Attribution Statements: NVIDIA includes `nemo-labs-oo-agents` under the Apache License 2.0 for use with NVIDIA OO Agents.
+nooa - Apache License 2.0
+Attribution Statements: NVIDIA includes `nooa` under the Apache License 2.0 for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/Apache-2.0.html)
 Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 
@@ -188,7 +188,7 @@ Source/Homepage: https://github.com/encode/uvicorn
 
 ---
 
-## `nemo-labs-oo-agents[arc]`
+## `nooa[arc]`
 
 arc-agi - Apache License 2.0
 Attribution Statements: NVIDIA includes `arc-agi` under the Apache License 2.0 for use with NVIDIA OO Agents.
@@ -212,7 +212,7 @@ Source/Homepage: https://github.com/Textualize/rich
 
 ---
 
-## `nemo-labs-oo-agents[tracing]`
+## `nooa[tracing]`
 
 openinference-instrumentation - Apache License 2.0
 Attribution Statements: NVIDIA includes `openinference-instrumentation` under the Apache License 2.0 for use with NVIDIA OO Agents.
@@ -241,7 +241,7 @@ Source/Homepage: https://github.com/open-telemetry/opentelemetry-python
 
 ---
 
-## `nemo-labs-oo-agents[viewer]`
+## `nooa[viewer]`
 
 fastapi - MIT License
 Attribution Statements: NVIDIA includes `fastapi` under the MIT License for use with NVIDIA OO Agents.
@@ -279,7 +279,7 @@ Source/Homepage: https://github.com/samuelcolvin/watchfiles
 
 ---
 
-## `nemo-labs-oo-agents[mcp]`
+## `nooa[mcp]`
 
 mcp - MIT License
 Attribution Statements: NVIDIA includes `mcp` under the MIT License for use with NVIDIA OO Agents.
@@ -288,7 +288,7 @@ Source/Homepage: https://github.com/modelcontextprotocol/python-sdk
 
 ---
 
-## `nemo-labs-oo-agents[sandbox]`
+## `nooa[sandbox]`
 
 openshell - MIT License
 Attribution Statements: NVIDIA includes `openshell` under the MIT License for use with NVIDIA OO Agents.
@@ -297,7 +297,7 @@ Source/Homepage: https://github.com/Agent-on-the-Fly/OpenShell
 
 ---
 
-## `nemo-labs-oo-agents[nvidia]`
+## `nooa[nvidia]`
 
 nemo-oo-agents-nvidia - Apache License 2.0
 Attribution Statements: NVIDIA includes `nemo-oo-agents-nvidia` under the Apache License 2.0 for use with NVIDIA OO Agents.
@@ -306,7 +306,7 @@ Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 
 ---
 
-## `nemo-labs-oo-agents-cli[ast]`
+## `nooa-cli[ast]`
 
 tree-sitter - MIT License
 Attribution Statements: NVIDIA includes `tree-sitter` under the MIT License for use with NVIDIA OO Agents.
@@ -340,7 +340,7 @@ Source/Homepage: https://github.com/tree-sitter/tree-sitter-typescript
 
 ---
 
-## `nemo-labs-oo-agents-cli[datascience]`
+## `nooa-cli[datascience]`
 
 numpy - BSD 3-Clause License
 Attribution Statements: NVIDIA includes `numpy` under the BSD 3-Clause License for use with NVIDIA OO Agents.
@@ -369,15 +369,15 @@ Source/Homepage: https://github.com/scipy/scipy
 
 ---
 
-## `nemo-labs-oo-agents-cli[web]`
+## `nooa-cli[web]`
 
 fastapi - MIT License
 Attribution Statements: NVIDIA includes `fastapi` under the MIT License for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/MIT.html)
 Source/Homepage: https://github.com/fastapi/fastapi
 
-nemo-labs-oo-agents-cli[datascience] - Apache License 2.0
-Attribution Statements: NVIDIA includes `nemo-labs-oo-agents-cli[datascience]` under the Apache License 2.0 for use with NVIDIA OO Agents.
+nooa-cli[datascience] - Apache License 2.0
+Attribution Statements: NVIDIA includes `nooa-cli[datascience]` under the Apache License 2.0 for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/Apache-2.0.html)
 Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 

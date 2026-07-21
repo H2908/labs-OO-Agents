@@ -15,10 +15,10 @@ exclude-newer = "2026-07-03T00:00:00Z"
 [manifest]
 members = [
     "eval-pipeline",
-    "nemo-labs-oo-agents",
-    "nemo-labs-oo-agents-bench",
-    "nemo-labs-oo-agents-cli",
-    "nemo-labs-oo-agents-memory",
+    "nooa",
+    "nooa-bench",
+    "nooa-cli",
+    "nooa-memory",
 ]
 
 [[package]]
@@ -502,7 +502,7 @@ version = "0.2.0"
 source = { editable = "util/eval_pipeline" }
 dependencies = [
     { name = "fastapi" },
-    { name = "nemo-labs-oo-agents", extra = ["viewer"] },
+    { name = "nooa", extra = ["viewer"] },
     { name = "pyyaml" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -515,7 +515,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.109.1" },
-    { name = "nemo-labs-oo-agents", extras = ["viewer"], editable = "." },
+    { name = "nooa", extras = ["viewer"], editable = "." },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.20.0" },
@@ -1402,14 +1402,34 @@ wheels = [
 ]
 
 [[package]]
-name = "nemo-labs-oo-agents"
+name = "nemo-relay"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/f0/1626672dd86005570afbcd4e368f5f271bcd2104ceaee883e839b11bfc81/nemo_relay-0.4.0-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:d5f14fe5c8e5fbcc26827cc88e5b867f4ad37d6f983100cbf31705234c39f9d3", size = 6674344, upload-time = "2026-06-12T23:24:02.707Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/35/956142c558334ec8594d97da6a1a717e70ba43685659dbdf18965c87c3f5/nemo_relay-0.4.0-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6a5a5f5dec1428085f6c41c3645f1773f9cfb154cfa47306c93d6514091a8006", size = 5989959, upload-time = "2026-06-12T23:24:04.496Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/56/e5172ec8486deb23dabf5c948be81b8172840efdfcda42b1da1a8d9ef969/nemo_relay-0.4.0-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0f92883b81540076e4b6c5e754eb7726225336634204ebd22ff730ccbcfb2723", size = 6332992, upload-time = "2026-06-12T23:24:06.288Z" },
+    { url = "https://files.pythonhosted.org/packages/e4/ea/f44b16ecfebc1de47e2d832e63d9cf56ad24952f09d6182d9fa9fa276b05/nemo_relay-0.4.0-cp311-abi3-win_amd64.whl", hash = "sha256:a5d02d9d0a2d19bf341bf9fd1faae01713bc2021a5b144ef79f91a07ec4c0bfb", size = 6332134, upload-time = "2026-06-12T23:24:08.017Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/45/eeedc7b7b5d2dea6be24f6ccca529abf3f97568d8dccff35de6430187ebe/nemo_relay-0.4.0-cp311-abi3-win_arm64.whl", hash = "sha256:dc1effd4052d1d47a1cdc553415c878a73d1e01c81a7e9f9194b30a3c88d1947", size = 5964432, upload-time = "2026-06-12T23:24:09.789Z" },
+]
+
+[[package]]
+name = "nodeenv"
+version = "1.10.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/bf/d1bda4f6168e0b2e9e5958945e01910052158313224ada5ce1fb2e1113b8/nodeenv-1.10.0.tar.gz", hash = "sha256:996c191ad80897d076bdfba80a41994c2b47c68e224c542b48feba42ba00f8bb", size = 55611, upload-time = "2025-12-20T14:08:54.006Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/b2/d0896bdcdc8d28a7fc5717c305f1a861c26e18c05047949fb371034d98bd/nodeenv-1.10.0-py2.py3-none-any.whl", hash = "sha256:5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827", size = 23438, upload-time = "2025-12-20T14:08:52.782Z" },
+]
+
+[[package]]
+name = "nooa"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "litellm" },
     { name = "openinference-instrumentation-litellm" },
     { name = "pydantic" },
-    { name = "python-gitlab" },
 ]
 
 [package.optional-dependencies]
@@ -1449,9 +1469,9 @@ dev = [
     { name = "httpx", extra = ["socks"] },
     { name = "matplotlib" },
     { name = "mypy" },
-    { name = "nemo-labs-oo-agents-bench" },
-    { name = "nemo-labs-oo-agents-cli" },
-    { name = "nemo-labs-oo-agents-memory" },
+    { name = "nooa-bench" },
+    { name = "nooa-cli" },
+    { name = "nooa-memory" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "pandas" },
     { name = "pre-commit" },
@@ -1497,7 +1517,6 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'arc'", specifier = ">=10.0" },
     { name = "pydantic", specifier = ">=2.5.0" },
     { name = "python-dotenv", marker = "extra == 'viewer'", specifier = ">=1.0.0" },
-    { name = "python-gitlab", specifier = ">=8.3.0" },
     { name = "python-multipart", marker = "extra == 'viewer'", specifier = ">=0.0.5" },
     { name = "rich", marker = "extra == 'arc'", specifier = ">=13.0" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'viewer'", specifier = ">=0.20.0" },
@@ -1511,9 +1530,9 @@ dev = [
     { name = "httpx", extras = ["socks"], specifier = ">=0.28.1" },
     { name = "matplotlib", specifier = ">=3.8.0" },
     { name = "mypy", specifier = ">=1.7.0" },
-    { name = "nemo-labs-oo-agents-bench", editable = "packages/nooa-bench" },
-    { name = "nemo-labs-oo-agents-cli", editable = "packages/nooa-cli" },
-    { name = "nemo-labs-oo-agents-memory", editable = "packages/nooa-memory" },
+    { name = "nooa-bench", editable = "packages/nooa-bench" },
+    { name = "nooa-cli", editable = "packages/nooa-cli" },
+    { name = "nooa-memory", editable = "packages/nooa-memory" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.39.1" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "pre-commit", specifier = ">=4.5.0" },
@@ -1542,29 +1561,29 @@ trace-viewer = [
 ]
 
 [[package]]
-name = "nemo-labs-oo-agents-bench"
+name = "nooa-bench"
 source = { editable = "packages/nooa-bench" }
 dependencies = [
     { name = "click" },
-    { name = "nemo-labs-oo-agents" },
-    { name = "nemo-labs-oo-agents-cli" },
+    { name = "nooa" },
+    { name = "nooa-cli" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1" },
-    { name = "nemo-labs-oo-agents", editable = "." },
-    { name = "nemo-labs-oo-agents-cli", editable = "packages/nooa-cli" },
+    { name = "nooa", editable = "." },
+    { name = "nooa-cli", editable = "packages/nooa-cli" },
 ]
 
 [[package]]
-name = "nemo-labs-oo-agents-cli"
+name = "nooa-cli"
 source = { editable = "packages/nooa-cli" }
 dependencies = [
     { name = "click" },
     { name = "ipython" },
     { name = "mcp" },
-    { name = "nemo-labs-oo-agents" },
+    { name = "nooa" },
     { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pyyaml" },
@@ -1604,7 +1623,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.123.4" },
     { name = "ipython", specifier = ">=9.12.0" },
     { name = "mcp", specifier = ">=1.0.0" },
-    { name = "nemo-labs-oo-agents", editable = "." },
+    { name = "nooa", editable = "." },
     { name = "numpy", marker = "extra == 'datascience'", specifier = ">=1.24.0" },
     { name = "numpy", marker = "extra == 'web'", specifier = ">=1.24.0" },
     { name = "pandas", marker = "extra == 'datascience'", specifier = ">=2.0.0" },
@@ -1631,40 +1650,19 @@ requires-dist = [
 provides-extras = ["ast", "datascience", "web"]
 
 [[package]]
-name = "nemo-labs-oo-agents-memory"
+name = "nooa-memory"
 source = { editable = "packages/nooa-memory" }
 dependencies = [
-    { name = "nemo-labs-oo-agents" },
+    { name = "nooa" },
     { name = "numpy" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "nemo-labs-oo-agents", editable = "." },
+    { name = "nooa", editable = "." },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "pydantic", specifier = ">=2.5.0" },
-]
-
-[[package]]
-name = "nemo-relay"
-version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/f0/1626672dd86005570afbcd4e368f5f271bcd2104ceaee883e839b11bfc81/nemo_relay-0.4.0-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:d5f14fe5c8e5fbcc26827cc88e5b867f4ad37d6f983100cbf31705234c39f9d3", size = 6674344, upload-time = "2026-06-12T23:24:02.707Z" },
-    { url = "https://files.pythonhosted.org/packages/c1/35/956142c558334ec8594d97da6a1a717e70ba43685659dbdf18965c87c3f5/nemo_relay-0.4.0-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6a5a5f5dec1428085f6c41c3645f1773f9cfb154cfa47306c93d6514091a8006", size = 5989959, upload-time = "2026-06-12T23:24:04.496Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/56/e5172ec8486deb23dabf5c948be81b8172840efdfcda42b1da1a8d9ef969/nemo_relay-0.4.0-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0f92883b81540076e4b6c5e754eb7726225336634204ebd22ff730ccbcfb2723", size = 6332992, upload-time = "2026-06-12T23:24:06.288Z" },
-    { url = "https://files.pythonhosted.org/packages/e4/ea/f44b16ecfebc1de47e2d832e63d9cf56ad24952f09d6182d9fa9fa276b05/nemo_relay-0.4.0-cp311-abi3-win_amd64.whl", hash = "sha256:a5d02d9d0a2d19bf341bf9fd1faae01713bc2021a5b144ef79f91a07ec4c0bfb", size = 6332134, upload-time = "2026-06-12T23:24:08.017Z" },
-    { url = "https://files.pythonhosted.org/packages/3a/45/eeedc7b7b5d2dea6be24f6ccca529abf3f97568d8dccff35de6430187ebe/nemo_relay-0.4.0-cp311-abi3-win_arm64.whl", hash = "sha256:dc1effd4052d1d47a1cdc553415c878a73d1e01c81a7e9f9194b30a3c88d1947", size = 5964432, upload-time = "2026-06-12T23:24:09.789Z" },
-]
-
-[[package]]
-name = "nodeenv"
-version = "1.10.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/24/bf/d1bda4f6168e0b2e9e5958945e01910052158313224ada5ce1fb2e1113b8/nodeenv-1.10.0.tar.gz", hash = "sha256:996c191ad80897d076bdfba80a41994c2b47c68e224c542b48feba42ba00f8bb", size = 55611, upload-time = "2025-12-20T14:08:54.006Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/b2/d0896bdcdc8d28a7fc5717c305f1a861c26e18c05047949fb371034d98bd/nodeenv-1.10.0-py2.py3-none-any.whl", hash = "sha256:5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827", size = 23438, upload-time = "2025-12-20T14:08:52.782Z" },
 ]
 
 [[package]]
@@ -2379,19 +2377,6 @@ wheels = [
 ]
 
 [[package]]
-name = "python-gitlab"
-version = "8.4.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "requests" },
-    { name = "requests-toolbelt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/cc/96/c20b37e7fd86481e1bf2b1922e84b98dc5477fd9aafd30e5c5086f94d922/python_gitlab-8.4.0.tar.gz", hash = "sha256:f36f20ec3f09138f3b12089394941f4dbe5a407021bed71b70a04bbdd37b8a74", size = 410803, upload-time = "2026-05-28T02:43:32.857Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/af/1c3540dbdccb85fca0b0bbc58cdaf514d0a830d7e0302b2059a6c627b172/python_gitlab-8.4.0-py3-none-any.whl", hash = "sha256:102c747d9c107820e215cc5913627388001592a9a3ba1b43fc341a40f6943e72", size = 148242, upload-time = "2026-05-28T02:43:31.505Z" },
-]
-
-[[package]]
 name = "python-multipart"
 version = "0.0.32"
 source = { registry = "https://pypi.org/simple" }
@@ -2524,18 +2509,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed", size = 142856, upload-time = "2026-05-14T19:25:27.735Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
-]
-
-[[package]]
-name = "requests-toolbelt"
-version = "1.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "requests" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f3/61/d7545dafb7ac2230c70d38d31cbfe4cc64f7144dc41f6e4e4b78ecd9f5bb/requests-toolbelt-1.0.0.tar.gz", hash = "sha256:7681a0a3d047012b5bdc0ee37d7f8f07ebe76ab08caeccfc3921ce23c88d5bc6", size = 206888, upload-time = "2023-05-01T04:11:33.229Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/51/d4db610ef29373b879047326cbf6fa98b6c1969d6f6dc423279de2b1be2c/requests_toolbelt-1.0.0-py2.py3-none-any.whl", hash = "sha256:cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06", size = 54481, upload-time = "2023-05-01T04:11:28.427Z" },
 ]
 
 [[package]]

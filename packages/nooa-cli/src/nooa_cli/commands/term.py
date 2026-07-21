@@ -135,7 +135,7 @@ def command(
         from uvicorn import Config, Server
     except ImportError:
         click.echo(
-            'Web terminal requires uvicorn. Install with: uv add "nemo-labs-oo-agents-cli[web]"',
+            'Web terminal requires uvicorn. Install with: uv add "nooa-cli[web]"',
             err=True,
         )
         sys.exit(1)
@@ -144,7 +144,7 @@ def command(
         import ptyprocess  # noqa: F401
     except ImportError:
         click.echo(
-            'Web terminal requires ptyprocess. Install with: uv add "nemo-labs-oo-agents-cli[web]"',
+            'Web terminal requires ptyprocess. Install with: uv add "nooa-cli[web]"',
             err=True,
         )
         sys.exit(1)

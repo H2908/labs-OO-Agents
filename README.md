@@ -55,7 +55,7 @@ Install directly from GitHub with [uv](https://docs.astral.sh/uv/getting-started
 uv init my-agent-project
 cd my-agent-project
 
-uv add "nemo-labs-oo-agents @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main"
+uv add "nooa @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main"
 ```
 
 <details>
@@ -67,10 +67,10 @@ All of these live in the same repo and are addressed with `#subdirectory=…`.
 
 ```bash
 # CLI + TUI (beta): the `nooa` command, agent REPL, trace viewer, TUI
-uv add "nemo-labs-oo-agents-cli @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=packages/nooa-cli"
+uv add "nooa-cli @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=packages/nooa-cli"
 
 # Long-term memory subsystem (MemoryManager)
-uv add "nemo-labs-oo-agents-memory @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=packages/nooa-memory"
+uv add "nooa-memory @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=packages/nooa-memory"
 
 # Evaluation pipeline for agent testing
 uv add "eval_pipeline @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=util/eval_pipeline"

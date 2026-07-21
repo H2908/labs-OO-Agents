@@ -7,7 +7,7 @@ from __future__ import annotations
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _metadata_version
 
-_PACKAGE_NAME = "nooa"
+_PACKAGE_NAME = "nooa"  # distribution that ships the nooa package
 _UNKNOWN_VERSION = "0.0.0+unknown"
 
 

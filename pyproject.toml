@@ -1,5 +1,5 @@
 [project]
-name = "nemo-labs-oo-agents"
+name = "nooa"
 # Version is derived from git tags at build time by uv-dynamic-versioning
 # (see [build-system] and [tool.uv-dynamic-versioning] below). On a tag
 # `vX.Y.Z` the published wheel is `X.Y.Z`; between tags, dunamai produces
@@ -22,7 +22,6 @@ dependencies = [
     # from mcp-nemo-oo-agents (now internal)
     "httpx>=0.27.0",
     "openinference-instrumentation-litellm>=0.1.30",
-    "python-gitlab>=8.3.0",
 ]
 
 [project.scripts]
@@ -40,9 +39,9 @@ trace-explorer = "nooa.trace_explorer:main"
 
 [tool.uv.sources]
 eval_pipeline = { workspace = true }
-nemo-labs-oo-agents-cli = { workspace = true }
-nemo-labs-oo-agents-memory = { workspace = true }
-nemo-labs-oo-agents-bench = { workspace = true }
+nooa-cli = { workspace = true }
+nooa-memory = { workspace = true }
+nooa-bench = { workspace = true }
 
 [tool.uv]
 # Extra index URLs to search for packages (in addition to PyPI)
@@ -101,9 +100,9 @@ nemo-relay = [
     "nemo-relay>=0.4.0",
 ]
 
-# CLI/TUI ship as a separate package: `uv add nemo-labs-oo-agents-cli`.
-# Data-science stack for the LLM REPL: `uv add nemo-labs-oo-agents-cli[datascience]`.
-# Web-served TUI (`nooa term`):     `uv add nemo-labs-oo-agents-cli[web]`.
+# CLI/TUI ship as a separate package: `uv add nooa-cli`.
+# Data-science stack for the LLM REPL: `uv add nooa-cli[datascience]`.
+# Web-served TUI (`nooa term`):     `uv add nooa-cli[web]`.
 
 [build-system]
 requires = ["hatchling>=1.26.0", "uv-dynamic-versioning>=0.14.0"]
@@ -154,9 +153,9 @@ dev = [
     "opentelemetry-exporter-otlp-proto-http>=1.39.1",
     "eval_pipeline",
     # Workspace packages — keep bench + cli + memory installed/editable in dev sync
-    "nemo-labs-oo-agents-cli",
-    "nemo-labs-oo-agents-memory",
-    "nemo-labs-oo-agents-bench",
+    "nooa-cli",
+    "nooa-memory",
+    "nooa-bench",
     "pre-commit>=4.5.0",
     "pyright>=1.1.408",
     "pytest-cov>=7.1.0",
