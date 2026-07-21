@@ -42,7 +42,7 @@ class SupportAgent(Agent):
 
 **What's happening here:**
 
-- **Agents are Python classes.** Fields are state, methods are capabilities, docstrings are prompts, type annotations are contracts.
+- **Agents are Python objects.** Fields are state, methods are capabilities, docstrings are prompts, type annotations are contracts.
 - **`...` bodies are LLM-driven.** A method with `...` becomes an agentic loop; a real body stays deterministic Python. 
 - **Code as action.** The model acts by writing Python in a Jupyter-style REPL with access to `self`, imports, and helpers — no bespoke tool schemas.
 - **Pythonic and agent-ready.** Typed I/O with auto-retry, live-object arguments passed by reference, and model-callable context and event APIs — designed for agents from the ground up.
