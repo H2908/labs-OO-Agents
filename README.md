@@ -141,7 +141,7 @@ If the viewer isn't running, tracing is silently disabled — no configuration n
 - **[examples/README.md](examples/README.md)** — the full progressive tutorial: structured output, tools via `self`, strategies, progressive disclosure with `doc()`, tracing, dynamic prompts, context blocks, summarization, skills, MCP, sandbox, and more.
 - **[Paper](PAPER_URL)** — design principles, harness details, capability tests, and SWE-bench Verified / Terminal-Bench 2.0 results.
 - **[Blog post](BLOG_URL)** — WIP.
-- **[CLAUDE.md](CLAUDE.md)** — conventions used inside this repo (helpful when reading the source).
+- **[AGENTS.md](AGENTS.md)** — conventions used inside this repo (helpful when reading the source).
 
 ## Contributing
 
