@@ -60,7 +60,7 @@ await self.libs.list(); await self.libs.repo_tree()            # discovery
 
 ## Slash commands (`@slash_command`)
 
-Skills can ship user-typed `/commands` (dispatch: `nooa.slash_dispatch`; TUI surfaces them):
+Skills can ship user-typed `/commands` (dispatch: `nooa.slash_dispatch`; hosts driving `InteractiveAgent` surface them via the `slash_commands` queue):
 
 ```python
 from nooa.skill import Skill, slash_command

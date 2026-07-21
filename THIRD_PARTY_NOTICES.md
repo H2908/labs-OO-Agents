@@ -50,89 +50,15 @@ Attribution Statements: NVIDIA includes `click` under the BSD 3-Clause License f
 License Text(https://spdx.org/licenses/BSD-3-Clause.html)
 Source/Homepage: https://github.com/pallets/click
 
-ipython - BSD 3-Clause License
-Attribution Statements: NVIDIA includes `ipython` under the BSD 3-Clause License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
-Source/Homepage: https://github.com/ipython/ipython
-
-mcp - MIT License
-Attribution Statements: NVIDIA includes `mcp` under the MIT License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/MIT.html)
-Source/Homepage: https://github.com/modelcontextprotocol/python-sdk
-
 nooa - Apache License 2.0
 Attribution Statements: NVIDIA includes `nooa` under the Apache License 2.0 for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/Apache-2.0.html)
 Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
 
-prompt-toolkit - BSD 3-Clause License
-Attribution Statements: NVIDIA includes `prompt-toolkit` under the BSD 3-Clause License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
-Source/Homepage: https://github.com/prompt-toolkit/python-prompt-toolkit
-
-pydantic - MIT License
-Attribution Statements: NVIDIA includes `pydantic` under the MIT License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/MIT.html)
-Source/Homepage: https://github.com/pydantic/pydantic
-
 pyyaml - MIT License
 Attribution Statements: NVIDIA includes `pyyaml` under the MIT License for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/MIT.html)
 Source/Homepage: https://github.com/yaml/pyyaml
-
-rich - MIT License
-Attribution Statements: NVIDIA includes `rich` under the MIT License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/MIT.html)
-Source/Homepage: https://github.com/Textualize/rich
-
----
-
-## `nooa-tui`
-
-click - BSD 3-Clause License
-Attribution Statements: NVIDIA includes `click` under the BSD 3-Clause License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
-Source/Homepage: https://github.com/pallets/click
-
-ipython - BSD 3-Clause License
-Attribution Statements: NVIDIA includes `ipython` under the BSD 3-Clause License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
-Source/Homepage: https://github.com/ipython/ipython
-
-mcp - MIT License
-Attribution Statements: NVIDIA includes `mcp` under the MIT License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/MIT.html)
-Source/Homepage: https://github.com/modelcontextprotocol/python-sdk
-
-nooa - Apache License 2.0
-Attribution Statements: NVIDIA includes `nooa` under the Apache License 2.0 for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/Apache-2.0.html)
-Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
-
-nooa-cli - Apache License 2.0
-Attribution Statements: NVIDIA includes `nooa-cli` under the Apache License 2.0 for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/Apache-2.0.html)
-Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
-
-prompt-toolkit - BSD 3-Clause License
-Attribution Statements: NVIDIA includes `prompt-toolkit` under the BSD 3-Clause License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
-Source/Homepage: https://github.com/prompt-toolkit/python-prompt-toolkit
-
-pydantic - MIT License
-Attribution Statements: NVIDIA includes `pydantic` under the MIT License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/MIT.html)
-Source/Homepage: https://github.com/pydantic/pydantic
-
-pyyaml - MIT License
-Attribution Statements: NVIDIA includes `pyyaml` under the MIT License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/MIT.html)
-Source/Homepage: https://github.com/yaml/pyyaml
-
-rich - MIT License
-Attribution Statements: NVIDIA includes `rich` under the MIT License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/MIT.html)
-Source/Homepage: https://github.com/Textualize/rich
 
 ---
 
@@ -366,30 +292,6 @@ scipy - BSD 3-Clause License
 Attribution Statements: NVIDIA includes `scipy` under the BSD 3-Clause License for use with NVIDIA OO Agents.
 License Text(https://spdx.org/licenses/BSD-3-Clause.html)
 Source/Homepage: https://github.com/scipy/scipy
-
----
-
-## `nooa-cli[web]`
-
-fastapi - MIT License
-Attribution Statements: NVIDIA includes `fastapi` under the MIT License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/MIT.html)
-Source/Homepage: https://github.com/fastapi/fastapi
-
-nooa-cli[datascience] - Apache License 2.0
-Attribution Statements: NVIDIA includes `nooa-cli[datascience]` under the Apache License 2.0 for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/Apache-2.0.html)
-Source/Homepage: https://github.com/NVIDIA-NeMo/labs-OO-Agents
-
-ptyprocess - ISC License
-Attribution Statements: NVIDIA includes `ptyprocess` under the ISC License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/ISC.html)
-Source/Homepage: https://github.com/pexpect/ptyprocess
-
-uvicorn - BSD 3-Clause License
-Attribution Statements: NVIDIA includes `uvicorn` under the BSD 3-Clause License for use with NVIDIA OO Agents.
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
-Source/Homepage: https://github.com/encode/uvicorn
 
 ---
 

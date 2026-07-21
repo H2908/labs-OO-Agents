@@ -100,9 +100,8 @@ nemo-relay = [
     "nemo-relay>=0.4.0",
 ]
 
-# CLI/TUI ship as a separate package: `uv add nooa-cli`.
+# CLI ships as a separate package: `uv add nooa-cli`.
 # Data-science stack for the LLM REPL: `uv add nooa-cli[datascience]`.
-# Web-served TUI (`nooa term`):     `uv add nooa-cli[web]`.
 
 [build-system]
 requires = ["hatchling>=1.26.0", "uv-dynamic-versioning>=0.14.0"]
@@ -159,8 +158,6 @@ dev = [
     "pre-commit>=4.5.0",
     "pyright>=1.1.408",
     "pytest-cov>=7.1.0",
-    "pyte>=0.8.2",
-    "ptyprocess>=0.7.0",
     # Data-science libs exercised by core tests (REPL scoping, return-type
     # adapters, doc adapters). Previously installed transitively via the
     # benchmarks package, which moved to nooa-dev.
