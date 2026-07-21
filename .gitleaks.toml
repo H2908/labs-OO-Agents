@@ -1,0 +1,11 @@
+# Gitleaks configuration for the CI secret-scan job.
+title = "NOOA gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Intentionally fake secrets used to test the secret-scrubber feature"
+paths = [
+  '''tests/tracing/test_secret_scrubber\.py''',
+]
