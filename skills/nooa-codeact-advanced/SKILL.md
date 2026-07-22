@@ -1,12 +1,12 @@
 ---
-name: nemo-oo-codeact-advanced
+name: nooa-codeact-advanced
 description: Advanced tuning of NVIDIA OO Agents strategies — CodeAct prefill (understanding, disabling, custom, pre-ellipsis code), loop guards (max_iterations, retries, text-only stop), truncation tuning (TruncationConfig/CaptureConfig/FormatConfig), code restrictions (RestrictionsConfig), execution environment internals, and PredictStrategy tuning (retries, param guards, output_serialization). Use when configuring CodeActConfig or PredictConfig beyond defaults, writing a custom prefill, restricting generated code, or debugging truncation/eviction behavior.
-compatibility: nemo-oo-agents core package
+compatibility: nooa package
 ---
 
 # Advanced CodeAct (and Predict) Tuning
 
-The authoring basics are in `nemo-oo-agent-authoring`. This skill covers the deep configuration surface, verified against `strategies/codeact.py`, `strategies/prefill.py`, `strategies/predict.py`, and `config/`.
+The authoring basics are in `nooa-agent-authoring`. This skill covers the deep configuration surface, verified against `strategies/codeact.py`, `strategies/prefill.py`, `strategies/predict.py`, and `config/`.
 
 ## Config plumbing rules (read first)
 
@@ -124,6 +124,6 @@ Single LLM turn, no tools, no code. The prompt is the docstring plus each parame
 
 ## Related skills
 
-- `nemo-oo-agent-authoring` — the basics this builds on (strategy selection, contracts, visibility).
-- `nemo-oo-context-and-state` — the context blocks that truncation/eviction act on.
-- `nemo-oo-capturing-traces` / `nemo-oo-trace-explorer` — see every prefill cell, tool call, and validation retry in the trace.
+- `nooa-agent-authoring` — the basics this builds on (strategy selection, contracts, visibility).
+- `nooa-context-and-state` — the context blocks that truncation/eviction act on.
+- `nooa-capturing-traces` / `nooa-trace-explorer` — see every prefill cell, tool call, and validation retry in the trace.
