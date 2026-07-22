@@ -18,7 +18,7 @@
   >
 </picture>
 
-<h3 align="center">The Pythonic way to build AI agents.</h3>
+<p align="center"><b>The Pythonic way to build AI agents.</b></p>
 
 [![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
 [![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](PAPER_URL)
