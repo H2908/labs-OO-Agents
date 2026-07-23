@@ -18,7 +18,7 @@
   >
 </picture>
 
-<p align="center"><b>The Pythonic way to build AI agents.</b></p>
+<p align="center"><b>A Pythonic way to build AI agents.</b></p>
 
 [![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
 [![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](PAPER_URL)
@@ -32,7 +32,7 @@
 </div>
 
 
-NVIDIA-labs OO Agents (NOOA) is a model-agnostic Python framework for building reliable AI agents. Traditional agent frameworks scatter your code across prompt templates, tool schemas, callback handlers, and workflow graphs. NOOA collapses all of that into a single Python class:
+NVIDIA-labs OO Agents (NOOA) is a model-agnostic Python framework designed to support reliable AI agent development. Many agent frameworks represent prompts, tools, callbacks, and workflows as separate abstractions. NOOA offers an alternative object-oriented interface that brings these concepts together in a Python class. NOOA lets developers express an agent’s state, capabilities, prompts, and typed interfaces through a single Python class:
 
 ```python
 from nooa import Agent
@@ -58,10 +58,10 @@ class SupportAgent(Agent):
 
 - **Agents are Python objects.** Fields are state, methods are capabilities, docstrings are prompts, type annotations are contracts.
 - **`...` bodies are LLM-driven.** A method with `...` becomes an agentic loop; a real body stays deterministic Python. 
-- **Code as action.** The model acts by writing Python in a Jupyter-style REPL with access to `self`, imports, and helpers — no bespoke tool schemas.
-- **Pythonic and agent-ready.** Typed I/O with auto-retry, live-object arguments passed by reference, and model-callable context and event APIs — designed for agents from the ground up.
+- **Code as action.** The model acts by writing Python in a Jupyter-style REPL with access to `self`, imports, and helpers — Python methods and type annotations supply the callable interfaces, reducing the need to write separate tool-schema definitions.
+- **Pythonic and agent-ready.** Typed I/O with auto-retry, live-object arguments passed by reference, and model-callable context and event APIs — designed around agent-oriented Python workflows.
 
-The result: agents you can test, trace, refactor, and version — **just like the rest of your software**. Read the paper for the design principles and evaluation results: [NVIDIA OO Agents: Native Python Object-Oriented Agents](PAPER_URL).
+This design supports familiar Python testing, tracing, refactoring, and version-control workflows — **just like the rest of your software**. Read the paper for the design principles and evaluation results: [NVIDIA OO Agents: Native Python Object-Oriented Agents](PAPER_URL).
 
 ## Installation
 
@@ -98,7 +98,7 @@ uv add "eval_pipeline @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@ma
 
 ### Choose a model
 
-Pick any [LiteLLM-supported](https://docs.litellm.ai/) model — hosted or local:
+Choose from supported hosted or local [LiteLLM-supported](https://docs.litellm.ai/) model:
 
 ```python
 from nooa.unifiedllm.registry import get_llm_client
