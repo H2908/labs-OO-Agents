@@ -2,9 +2,23 @@
 
 <br />
 
-<h1 align="center">NVIDIA-labs Object Oriented Agents</h1>
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="assets/nvidia-labs-object-oriented-agents-dark.svg"
+  >
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="assets/nvidia-labs-object-oriented-agents-light.svg"
+  >
+  <img
+    alt="NVIDIA-labs Object Oriented Agents"
+    src="assets/nvidia-labs-object-oriented-agents-light.svg"
+    width="820"
+  >
+</picture>
 
-<h3 align="center">The most Pythonic way to build AI agents.</h3>
+<p align="center"><b>The Pythonic way to build AI agents.</b></p>
 
 [![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
 [![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](PAPER_URL)
