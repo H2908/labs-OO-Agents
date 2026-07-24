@@ -21,11 +21,11 @@
 <p align="center"><b>A Pythonic way to build AI agents.</b></p>
 
 [![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
-[![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](PAPER_URL)
+[![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2607.20709)
 [![Blog](https://img.shields.io/badge/blog-coming%20soon-lightgrey)](BLOG_URL)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-**[Quick Start](#quick-start)** &nbsp;·&nbsp; **[Examples](examples/README.md)** &nbsp;·&nbsp; **[Paper](PAPER_URL)**
+**[Quick Start](#quick-start)** &nbsp;·&nbsp; **[Examples](examples/README.md)** &nbsp;·&nbsp; **[Paper](https://arxiv.org/abs/2607.20709)**
 
 <br />
 
@@ -61,7 +61,7 @@ class SupportAgent(Agent):
 - **Code as action.** The model acts by writing Python in a Jupyter-style REPL with access to `self`, imports, and helpers — Python methods and type annotations supply the callable interfaces, reducing the need to write separate tool-schema definitions.
 - **Pythonic and agent-ready.** Typed I/O with auto-retry, live-object arguments passed by reference, and model-callable context and event APIs — designed around agent-oriented Python workflows.
 
-This design supports familiar Python testing, tracing, refactoring, and version-control workflows — **just like the rest of your software**. Read the paper for the design principles and evaluation results: [NVIDIA OO Agents: Native Python Object-Oriented Agents](PAPER_URL).
+This design supports familiar Python testing, tracing, refactoring, and version-control workflows — **just like the rest of your software**. Read the paper for the design principles and evaluation results: [NVIDIA OO Agents: Native Python Object-Oriented Agents](https://arxiv.org/abs/2607.20709).
 
 ## Installation
 
@@ -159,7 +159,7 @@ If the viewer isn't running, tracing is silently disabled — no configuration n
 ## Learn more
 
 - **[examples/README.md](examples/README.md)** — the full progressive tutorial: structured output, tools via `self`, strategies, progressive disclosure with `doc()`, tracing, dynamic prompts, context blocks, summarization, skills, MCP, sandbox, and more.
-- **[Paper](PAPER_URL)** — design principles, harness details, capability tests, and SWE-bench Verified / Terminal-Bench 2.0 results.
+- **[Paper](https://arxiv.org/abs/2607.20709)** — design principles, harness details, capability tests, and SWE-bench Verified / Terminal-Bench 2.0 results.
 - **[Blog post](BLOG_URL)** — WIP.
 - **[AGENTS.md](AGENTS.md)** — conventions used inside this repo (helpful when reading the source).
 
