@@ -95,6 +95,12 @@ uv add "eval_pipeline @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@ma
 
 ## Quick Start
 
+## WARNING
+This is a research tool that can be configured to execute LLM-generated code. LLM-generated code may take dangerous or unwanted actions, incuding sending private data to uncontrolled locations, deleting files, or modifying its environments.  Ensure you run NOOA agents in a sandboxed environment isolated from your primary filesystem, such as [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell).
+
+> **Research software**  NOOA is research software, not production. We welcome contributions and fixes, but expect rough edges. 
+
+
 ### Choose a model
 
 Choose from supported hosted or local [LiteLLM-supported](https://docs.litellm.ai/) model:
