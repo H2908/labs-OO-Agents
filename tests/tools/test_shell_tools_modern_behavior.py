@@ -2,10 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Core behavior of the DEFAULT ShellTools (run / read / write_file / replace).
 
-The broad legacy behavior suite (test_shell_tools.py) targets ShellToolsLegacy.
 This keeps the *default* ShellTools — the one agents actually use — covered for
-its primary file/run surface, addressing the review concern that promoting v5
-to ShellTools left the default implementation under-tested.
+its primary file/run surface. Search-anchor behavior is covered separately in
+test_shell_tools_modern.py.
 """
 
 import pytest
