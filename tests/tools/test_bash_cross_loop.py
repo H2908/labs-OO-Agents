@@ -16,7 +16,7 @@ import asyncio
 import threading
 
 from nooa.tools._bash_session import BashSession
-from nooa.tools.shell_tools_legacy import ShellToolsLegacy as ShellTools
+from nooa.tools.shell_tools import ShellTools
 
 
 class TestCrossLoopLockContention:
