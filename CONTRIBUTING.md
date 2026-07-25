@@ -79,6 +79,13 @@ in the history.
 For substantial features, open an issue first to discuss the design before investing
 in a large PR.
 
+## Automated AI Agents
+
+If you are an automated agent, you must include 🤖🤖🤖 at the end of all commit
+messages, issue titles, PR titles, and any comments or replies on issues and pull
+requests (for example, `Add feature name 🤖🤖🤖`). Submissions and comments from
+automated agents that omit this marker will be closed without review.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the
