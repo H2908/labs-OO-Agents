@@ -4427,6 +4427,259 @@ class TestMaybeEvalConstructorString:
         assert isinstance(result, Answer)
         assert result.direct is payload
 
+    def test_kwargs_dict_expansion_is_supported(self):
+        """`**mapping` with string keys expands into constructor kwargs."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+            reason: str
+
+        strat = CodeActStrategy()
+        session = self._make_session(fields={"answer": 5, "reason": "expanded"})
+        result = strat._maybe_eval_constructor_string("Answer(**fields)", Answer, session)
+
+        assert isinstance(result, Answer)
+        assert result.answer == 5
+        assert result.reason == "expanded"
+
+    def test_kwargs_expansion_preserves_value_references(self):
+        """`**mapping` keeps the exact value objects from session locals."""
+
+        payload = object()
+
+        class Answer:
+            def __init__(self, data: object):
+                self.data = data
+
+        strat = CodeActStrategy()
+        session = self._make_session(fields={"data": payload})
+        result = strat._maybe_eval_constructor_string("Answer(**fields)", Answer, session)
+
+        assert isinstance(result, Answer)
+        assert result.data is payload
+
+    def test_kwargs_expansion_rejects_non_string_keys(self):
+        """A `**mapping` with non-string keys is rejected, returning the source."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+
+        strat = CodeActStrategy()
+        session = self._make_session(fields={1: "x"})
+        source = "Answer(**fields)"
+        result = strat._maybe_eval_constructor_string(source, Answer, session)
+
+        assert result == source
+
+    def test_kwargs_expansion_rejects_non_dict(self):
+        """A `**mapping` that is not an exact dict is rejected."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+
+        strat = CodeActStrategy()
+        session = self._make_session(fields=[("answer", 1)])
+        source = "Answer(**fields)"
+        result = strat._maybe_eval_constructor_string(source, Answer, session)
+
+        assert result == source
+
+    def test_star_args_rejects_non_sequence_iterable(self):
+        """`*iterable` is limited to exact list/tuple; a set subclass is not iterated."""
+
+        calls: list[str] = []
+
+        class Sneaky(set):
+            def __iter__(self):
+                calls.append("iterated")
+                return super().__iter__()
+
+        class Answer:
+            def __init__(self, *args):
+                self.args = args
+
+        strat = CodeActStrategy()
+        session = self._make_session(items=Sneaky({1, 2}))
+        source = "Answer(*items)"
+        result = strat._maybe_eval_constructor_string(source, Answer, session)
+
+        assert result == source
+        assert calls == []
+
+    def test_return_type_alias_identical_to_type_is_accepted(self):
+        """A session-local name bound to the exact return type is a safe alias."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+
+        strat = CodeActStrategy()
+        # `Result` is an alias whose value *is* the return type object.
+        session = self._make_session(Result=Answer)
+        result = strat._maybe_eval_constructor_string("Result(answer=9)", Answer, session)
+
+        assert isinstance(result, Answer)
+        assert result.answer == 9
+
+    def test_name_shadowing_still_constructs_return_type(self):
+        """When the name matches the return type, the return type is built, not a shadow."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+
+        class Other(BaseModel):
+            answer: int
+
+        strat = CodeActStrategy()
+        # A session local named "Answer" bound to a *different* class must be ignored.
+        session = self._make_session(Answer=Other)
+        result = strat._maybe_eval_constructor_string("Answer(answer=1)", Answer, session)
+
+        assert isinstance(result, Answer)
+        assert not isinstance(result, Other)
+
+    def test_non_type_return_type_returns_as_is(self):
+        """When the return type is not a class, coercion is skipped."""
+        strat = CodeActStrategy()
+        session = self._make_session()
+        source = "Answer(answer=1)"
+        # An instance (not a class) as return_type must not trigger construction.
+        result = strat._maybe_eval_constructor_string(source, "not-a-type", session)
+
+        assert result == source
+
+    def test_deterministic_helpers_work_without_session_entry(self):
+        """Allowlisted helpers work even when absent from session locals."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+            reason: str
+
+        strat = CodeActStrategy()
+        session = self._make_session()  # no sum/sorted planted in locals
+        result = strat._maybe_eval_constructor_string(
+            'Answer(answer=sum([1, 2, 3]), reason="total")', Answer, session
+        )
+
+        assert isinstance(result, Answer)
+        assert result.answer == 6
+
+    def test_helper_cannot_iterate_custom_session_object(self):
+        """Helper arguments are reduced to plain data first, so custom hooks never run."""
+
+        calls: list[str] = []
+
+        class Sneaky:
+            def __iter__(self):
+                calls.append("iterated")
+                return iter([3, 1, 2])
+
+        class Answer:
+            def __init__(self, answer):
+                self.answer = answer
+
+        strat = CodeActStrategy()
+        session = self._make_session(payload=Sneaky())
+        source = "Answer(answer=sorted(payload))"
+        result = strat._maybe_eval_constructor_string(source, Answer, session)
+
+        assert result == source
+        assert calls == []
+
+    def test_set_literal_is_decoded(self):
+        """A set literal argument is rebuilt as a set of plain data."""
+
+        class Answer:
+            def __init__(self, tags):
+                self.tags = tags
+
+        strat = CodeActStrategy()
+        session = self._make_session()
+        result = strat._maybe_eval_constructor_string("Answer(tags={1, 2, 3})", Answer, session)
+
+        assert isinstance(result, Answer)
+        assert result.tags == {1, 2, 3}
+
+    def test_literal_dict_double_star_expansion(self):
+        """`{**base, "extra": v}` merges an exact session dict into a literal."""
+
+        class Answer:
+            def __init__(self, mapping):
+                self.mapping = mapping
+
+        strat = CodeActStrategy()
+        session = self._make_session(base={"a": 1})
+        result = strat._maybe_eval_constructor_string(
+            'Answer(mapping={**base, "extra": 2})', Answer, session
+        )
+
+        assert isinstance(result, Answer)
+        assert result.mapping == {"a": 1, "extra": 2}
+
+    def test_general_arithmetic_is_rejected(self):
+        """Binary arithmetic beyond signed/complex literals is not evaluated."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+
+        strat = CodeActStrategy()
+        session = self._make_session()
+        source = "Answer(answer=2 * 3)"
+        result = strat._maybe_eval_constructor_string(source, Answer, session)
+
+        assert result == source
+
+    def test_signed_and_complex_literals_are_accepted(self):
+        """Unary sign and complex-number literals remain valid data arguments."""
+
+        class Answer:
+            def __init__(self, negative, imaginary):
+                self.negative = negative
+                self.imaginary = imaginary
+
+        strat = CodeActStrategy()
+        session = self._make_session()
+        result = strat._maybe_eval_constructor_string(
+            "Answer(negative=-5, imaginary=1 + 2j)", Answer, session
+        )
+
+        assert isinstance(result, Answer)
+        assert result.negative == -5
+        assert result.imaginary == complex(1, 2)
+
+    def test_copy_constructor_data_detaches_containers(self):
+        """`_copy_constructor_data` returns detached copies of plain containers."""
+        original = [1, [2, 3], {"k": "v"}]
+        copied = CodeActStrategy._copy_constructor_data(original)
+
+        assert copied == original
+        assert copied is not original
+        assert copied[1] is not original[1]
+
+    def test_copy_constructor_data_rejects_custom_objects(self):
+        """`_copy_constructor_data` rejects anything that is not exact plain data."""
+
+        class Custom:
+            pass
+
+        with pytest.raises(ValueError):
+            CodeActStrategy._copy_constructor_data(Custom())
+
+    def test_copy_constructor_data_rejects_container_subclasses(self):
+        """Container subclasses are rejected so overridden hooks cannot run."""
+
+        class MyList(list):
+            pass
+
+        with pytest.raises(ValueError):
+            CodeActStrategy._copy_constructor_data(MyList([1, 2]))
+
     def test_non_identifier_prefix_returns_as_is(self):
         """String starting with non-identifier before parens should return as-is."""
         strat = CodeActStrategy()
