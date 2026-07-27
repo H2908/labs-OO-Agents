@@ -9,7 +9,7 @@ test_shell_tools_modern.py.
 
 import pytest
 
-from nooa.tools.shell_tools import ShellTools
+from nooa.tools.shell_tools import Match, ShellTools
 
 
 @pytest.fixture
@@ -69,6 +69,23 @@ async def test_write_file_is_overwrite(sh, tmp_path):
     await sh.write_file("f.txt", "old")
     await sh.write_file("f.txt", "new")
     assert (tmp_path / "f.txt").read_text() == "new"
+
+
+@pytest.mark.asyncio
+async def test_file_operations_reject_paths_outside_cwd(sh, tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.txt"
+    outside.write_text("secret")
+
+    with pytest.raises(ValueError, match="escapes ShellTools cwd"):
+        await sh.read(f"../{outside.name}")
+    with pytest.raises(ValueError, match="escapes ShellTools cwd"):
+        await sh.replace(f"../{outside.name}", "secret", "changed")
+    with pytest.raises(ValueError, match="escapes ShellTools cwd"):
+        await sh.replace(Match(f"../{outside.name}", 1, 1, "secret"), "changed")
+    with pytest.raises(ValueError, match="escapes ShellTools cwd"):
+        await sh.write_file(str(outside), "overwritten")
+
+    assert outside.read_text() == "secret"
 
 
 @pytest.mark.asyncio

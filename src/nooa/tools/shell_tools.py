@@ -339,6 +339,16 @@ class ShellTools(Skill):
         """Terminate the underlying bash session owned by this shell."""
         await self._session.close()
 
+    def _resolve_path(self, path: str) -> Path:
+        """Resolve a file-operation path and require it to remain inside cwd."""
+        root = self.cwd.resolve()
+        resolved = (root / path).resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"path escapes ShellTools cwd: {path}") from exc
+        return resolved
+
     async def run(
         self,
         command: Annotated[str, spec(description="Shell command to execute")],
@@ -538,10 +548,10 @@ class ShellTools(Skill):
         out: list[Match] = []
         for mpath, line_no in keep:
             if mpath not in file_cache:
-                resolved = (self.cwd / mpath).resolve()
                 try:
+                    resolved = self._resolve_path(mpath)
                     file_cache[mpath] = resolved.read_text().splitlines(keepends=True)
-                except OSError:
+                except (OSError, ValueError):
                     return None
             lines = file_cache[mpath]
             if not (1 <= line_no <= len(lines)):
@@ -656,7 +666,7 @@ class ShellTools(Skill):
         Returns:
             Match with .text, .numbered, .path, .start, .end.
         """
-        resolved = (self.cwd / path).resolve()
+        resolved = self._resolve_path(path)
         content = resolved.read_text()
         all_lines = content.splitlines(keepends=True)
         total = len(all_lines)
@@ -698,7 +708,7 @@ class ShellTools(Skill):
         """
         if isinstance(target, Match):
             new_text = old_or_new
-            resolved = (self.cwd / target.path).resolve()
+            resolved = self._resolve_path(target.path)
             content = resolved.read_text()
             all_lines = content.splitlines(keepends=True)
 
@@ -724,7 +734,7 @@ class ShellTools(Skill):
                     "Did you mean replace(match, new_text)?"
                 )
             old_text = old_or_new
-            resolved = (self.cwd / target).resolve()
+            resolved = self._resolve_path(target)
             content = resolved.read_text()
 
             count = content.count(old_text)
@@ -762,7 +772,7 @@ class ShellTools(Skill):
             path: File path (relative to cwd).
             content: Full file content.
         """
-        resolved = (self.cwd / path).resolve()
+        resolved = self._resolve_path(path)
         resolved.parent.mkdir(parents=True, exist_ok=True)
         resolved.write_text(content)
         line_count = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
