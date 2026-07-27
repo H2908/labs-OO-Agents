@@ -139,8 +139,13 @@ class TestScrubString:
         assert scrub_string("") == ("", 0)
 
     def test_short_string(self):
-        """Strings below the minimum length are skipped (fast path)."""
+        """A clean short string passes through unchanged."""
         assert scrub_string("hello") == ("hello", 0)
+
+    def test_short_generic_secret(self):
+        result, count = scrub_string("client_secret=s3cr3t")
+        assert "s3cr3t" not in result
+        assert count == 1
 
     def test_preserves_surrounding_text(self):
         """Surrounding non-secret text is preserved around a redaction."""
@@ -202,6 +207,13 @@ class TestScrubValue:
     def test_none_passthrough(self):
         """None passes through unchanged with a zero count."""
         assert scrub_value(None) == (None, 0)
+
+    def test_nested_sensitive_keys(self):
+        result, count = scrub_value(
+            {"safe": {"client_secret": "short", "refresh_token": "provider-specific"}}
+        )
+        assert result == {"safe": {"client_secret": REDACTED, "refresh_token": REDACTED}}
+        assert count == 2
 
 
 class TestScrubStats:
