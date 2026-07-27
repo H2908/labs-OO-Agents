@@ -550,7 +550,6 @@ class OAuthHandler:
                     client_secret=self.config.client_secret,
                 )
             except httpx.HTTPStatusError as e:
-                error_detail = e.response.text if e.response else str(e)
                 error_json = None
                 try:
                     if e.response:
@@ -558,11 +557,7 @@ class OAuthHandler:
                 except Exception:
                     pass
 
-                logger.error(
-                    f"Token exchange failed: {e.response.status_code}, Request data: {data}, Response: {error_detail}",
-                )
-                if error_json:
-                    logger.error(f"Error details: {error_json}")
+                logger.error("Token exchange failed (HTTP %s)", e.response.status_code)
 
                 # Provide helpful error message for common issues
                 error_msg = f"Failed to exchange authorization code for token (HTTP {e.response.status_code})"
@@ -572,9 +567,6 @@ class OAuthHandler:
                         "Authorization codes are typically valid for only a few minutes. "
                         "Please try the OAuth flow again to get a fresh code."
                     )
-                else:
-                    error_msg += f": {error_detail}"
-
                 raise RuntimeError(error_msg) from e
 
     async def client_credentials_token(self) -> OAuthToken:
@@ -643,7 +635,7 @@ class OAuthHandler:
             logger.info("OAuth flow completed successfully")
             return token
         except Exception as e:
-            logger.error(f"OAuth flow failed: {e}")
+            logger.error("OAuth flow failed (%s)", type(e).__name__)
             raise
 
 

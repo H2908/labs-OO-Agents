@@ -5,6 +5,8 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+from nooa.tracing._secret_scrubber import REDACTED, _is_sensitive_key, scrub_value
+
 
 def enable_http_request_logging(
     output_dir: str | Path = ".",
@@ -89,11 +91,23 @@ def enable_http_request_logging(
 
     def _redact_headers(headers: dict) -> dict:
         """Redact sensitive headers like Authorization."""
-        redacted = dict(headers)
-        for key in list(redacted.keys()):
-            if key.lower() in ["authorization", "api-key", "x-api-key"]:
+        redacted = {}
+        for key, value in headers.items():
+            if _is_sensitive_key(key):
                 redacted[key] = "***REDACTED***"
+            else:
+                redacted[key], _ = scrub_value(value)
         return redacted
+
+    def _redact_body(body):
+        """Recursively scrub secrets before a parsed HTTP body is logged."""
+        scrubbed, _ = scrub_value(body)
+        if isinstance(scrubbed, dict) and scrubbed.get("grant_type") == "authorization_code":
+            # "code" is too generic for global key matching, but is a credential
+            # in an OAuth authorization-code exchange.
+            if "code" in scrubbed:
+                scrubbed["code"] = REDACTED
+        return scrubbed
 
     def _write_jsonl_entry(entry: dict):
         """Append a JSON entry to the JSONL error file."""
@@ -113,7 +127,7 @@ def enable_http_request_logging(
                 filename = output_path / f"request_{counter}_{model_name}.json"
 
                 with open(filename, "w") as f:
-                    json.dump(body_dict, f, indent=2)
+                    json.dump(_redact_body(body_dict), f, indent=2)
 
                 if verbose:
                     print(f"\n💾 Saved HTTP request to: {filename}")
@@ -144,7 +158,7 @@ def enable_http_request_logging(
         try:
             response_dict = {
                 "status_code": response.status_code,
-                "headers": dict(response.headers),
+                "headers": _redact_headers(dict(response.headers)),
             }
 
             try:
@@ -169,6 +183,8 @@ def enable_http_request_logging(
             except Exception as read_error:
                 response_dict["body"] = f"[Error reading response: {read_error}]"
 
+            response_dict["body"] = _redact_body(response_dict["body"])
+
             _save_response_file(response_dict, counter, model_name)
         except Exception as e:
             if verbose:
@@ -180,7 +196,7 @@ def enable_http_request_logging(
         try:
             response_dict = {
                 "status_code": response.status_code,
-                "headers": dict(response.headers),
+                "headers": _redact_headers(dict(response.headers)),
             }
 
             try:
@@ -205,6 +221,8 @@ def enable_http_request_logging(
 
             except Exception as read_error:
                 response_dict["body"] = f"[Error reading response: {read_error}]"
+
+            response_dict["body"] = _redact_body(response_dict["body"])
 
             _save_response_file(response_dict, counter, model_name)
         except Exception as e:
@@ -236,7 +254,7 @@ def enable_http_request_logging(
                         "url": str(request.url),
                         "method": request.method,
                         "headers": _redact_headers(dict(request.headers)),
-                        "body": body_dict,
+                        "body": _redact_body(body_dict),
                     }
             except Exception as e:
                 if verbose:
@@ -265,8 +283,8 @@ def enable_http_request_logging(
 
                     response_data = {
                         "status_code": response.status_code,
-                        "headers": dict(response.headers),
-                        "body": body_content,
+                        "headers": _redact_headers(dict(response.headers)),
+                        "body": _redact_body(body_content),
                     }
 
                     # Write JSONL entry
@@ -324,7 +342,7 @@ def enable_http_request_logging(
                         "url": str(request.url),
                         "method": request.method,
                         "headers": _redact_headers(dict(request.headers)),
-                        "body": body_dict,
+                        "body": _redact_body(body_dict),
                     }
             except Exception as e:
                 if verbose:
@@ -353,8 +371,8 @@ def enable_http_request_logging(
 
                     response_data = {
                         "status_code": response.status_code,
-                        "headers": dict(response.headers),
-                        "body": body_content,
+                        "headers": _redact_headers(dict(response.headers)),
+                        "body": _redact_body(body_content),
                     }
 
                     # Write JSONL entry
