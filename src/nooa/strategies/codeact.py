@@ -77,6 +77,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Small, deterministic expression subset accepted inside constructor-string
+# arguments.  The values supplied to these callables have already been reduced
+# to plain data by ``_safe_constructor_arg``; callbacks and object attributes
+# therefore cannot cross into this compatibility path.
+_SAFE_CONSTRUCTOR_CALLS = {
+    "abs": abs,
+    "all": all,
+    "any": any,
+    "len": len,
+    "max": max,
+    "min": min,
+    "round": round,
+    "sorted": sorted,
+    "sum": sum,
+}
+
+
 class _ReturnResultSignal(ExecutionSignal):
     """Signal raised when return_result() is called from within execute_python code.
 
@@ -2009,13 +2026,135 @@ Standard Python builtins and agent instance (`self`) are available."""
 
         return {"result": corrected_result}
 
+    @staticmethod
+    def _safe_constructor_arg(node: ast.AST, session_locals: dict[str, Any]) -> Any:
+        """Decode one constructor argument without executing Python code.
+
+        Literal constants/containers are decoded directly. Bare names retain
+        pass-by-reference semantics by resolving directly from the REPL namespace.
+        Containers are rebuilt recursively so they can contain those references
+        without evaluating Python expressions. A short allowlist covers common
+        deterministic expressions emitted by models, such as ``min(...)``; those
+        helpers operate only on copied plain data. Everything else, including
+        attributes and arbitrary callables, is rejected.
+        """
+
+        if isinstance(node, ast.Name):
+            if node.id not in session_locals:
+                raise ValueError(f"unknown constructor argument name: {node.id}")
+            # Dictionary lookup does not invoke any behavior on the referenced
+            # object. The trusted return type receives the same object identity.
+            return session_locals[node.id]
+
+        if isinstance(node, ast.Constant):
+            return CodeActStrategy._copy_constructor_data(node.value)
+
+        if isinstance(node, ast.List):
+            return [
+                CodeActStrategy._safe_constructor_arg(item, session_locals) for item in node.elts
+            ]
+
+        if isinstance(node, ast.Tuple):
+            return tuple(
+                CodeActStrategy._safe_constructor_arg(item, session_locals) for item in node.elts
+            )
+
+        if isinstance(node, ast.Set):
+            return {
+                CodeActStrategy._copy_constructor_data(
+                    CodeActStrategy._safe_constructor_arg(item, session_locals)
+                )
+                for item in node.elts
+            }
+
+        if isinstance(node, ast.Dict):
+            result: dict[Any, Any] = {}
+            for key_node, value_node in zip(node.keys, node.values, strict=True):
+                if key_node is None:
+                    expanded = CodeActStrategy._safe_constructor_arg(value_node, session_locals)
+                    if type(expanded) is not dict:
+                        raise ValueError("literal ** expansion must be an exact dict")
+                    for key, item in expanded.items():
+                        result[CodeActStrategy._copy_constructor_data(key)] = item
+                else:
+                    key = CodeActStrategy._copy_constructor_data(
+                        CodeActStrategy._safe_constructor_arg(key_node, session_locals)
+                    )
+                    item = CodeActStrategy._safe_constructor_arg(value_node, session_locals)
+                    result[key] = item
+            return result
+
+        # literal_eval supports numeric signs and complex-number literals without
+        # admitting general arithmetic or overloaded session objects.
+        if isinstance(node, (ast.UnaryOp, ast.BinOp)):
+            try:
+                return CodeActStrategy._copy_constructor_data(ast.literal_eval(node))
+            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError) as exc:
+                raise ValueError("unsupported constructor numeric expression") from exc
+
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            fn = _SAFE_CONSTRUCTOR_CALLS.get(node.func.id)
+            if fn is None:
+                raise ValueError(f"unsupported constructor argument call: {node.func.id}")
+            args = [
+                CodeActStrategy._copy_constructor_data(
+                    CodeActStrategy._safe_constructor_arg(arg, session_locals)
+                )
+                for arg in node.args
+            ]
+            kwargs: dict[str, Any] = {}
+            for keyword in node.keywords:
+                if keyword.arg is None:
+                    expanded = CodeActStrategy._copy_constructor_data(
+                        CodeActStrategy._safe_constructor_arg(keyword.value, session_locals)
+                    )
+                    if type(expanded) is not dict or not all(type(key) is str for key in expanded):
+                        raise ValueError("safe call **kwargs must be a string-keyed dict")
+                    kwargs.update(expanded)
+                else:
+                    kwargs[keyword.arg] = CodeActStrategy._copy_constructor_data(
+                        CodeActStrategy._safe_constructor_arg(keyword.value, session_locals)
+                    )
+            result = fn(*args, **kwargs)
+            return CodeActStrategy._copy_constructor_data(result)
+
+        raise ValueError(f"unsupported constructor argument syntax: {type(node).__name__}")
+
+    @staticmethod
+    def _copy_constructor_data(value: Any) -> Any:
+        """Copy an exact built-in scalar/container value or reject it.
+
+        Used only before invoking a fixed deterministic helper. Exact-type checks
+        prevent arbitrary references from reaching those calls through conversion
+        or iteration hooks.
+        """
+
+        if value is None or type(value) in (bool, int, float, complex, str, bytes):
+            return value
+        if type(value) is list:
+            return [CodeActStrategy._copy_constructor_data(item) for item in value]
+        if type(value) is tuple:
+            return tuple(CodeActStrategy._copy_constructor_data(item) for item in value)
+        if type(value) is set:
+            return {CodeActStrategy._copy_constructor_data(item) for item in value}
+        if type(value) is frozenset:
+            return frozenset(CodeActStrategy._copy_constructor_data(item) for item in value)
+        if type(value) is dict:
+            return {
+                CodeActStrategy._copy_constructor_data(key): CodeActStrategy._copy_constructor_data(
+                    item
+                )
+                for key, item in value.items()
+            }
+        raise ValueError(f"constructor argument {type(value).__name__} is not plain data")
+
     def _maybe_eval_constructor_string(self, value: str, return_type: Any, session: Any) -> Any:
-        """Eval a string that looks like a Python constructor call.
+        """Parse a string that looks like a Python constructor call.
 
         Detects patterns like 'ClassName(field=value, ...)' where ClassName
-        matches the expected return type. Evaluates in the session namespace
-        so the type is available. Returns the constructed object on success,
-        or the original string on failure.
+        matches the expected return type. Only plain literal/data arguments and
+        a small deterministic expression subset are accepted. Returns the
+        constructed object on success, or the original string on failure.
 
         This handles a common LLM failure mode where the model calls
         return_result as a tool with the constructor as a string argument
@@ -2034,21 +2173,46 @@ Standard Python builtins and agent instance (`self`) are available."""
         if not candidate_name.isidentifier():
             return value
 
-        # Check that the candidate name matches the expected return type
-        # or is available in session locals
+        # Only the trusted return type may be constructed. Preserve safe aliases
+        # without allowing an arbitrary session-local factory to become code.
         type_name = getattr(return_type, "__name__", None)
-        if candidate_name != type_name and candidate_name not in session.session_locals:
+        if not isinstance(return_type, type):
+            return value
+        if (
+            candidate_name != type_name
+            and session.session_locals.get(candidate_name) is not return_type
+        ):
             return value
 
-        # Build eval namespace: session locals + the return type itself (which may
-        # live in module globals rather than session_locals).
-        eval_ns = dict(session.session_locals)
-        if type_name and type_name not in eval_ns and isinstance(return_type, type):
-            eval_ns[type_name] = return_type
-
-        # Try to eval in the combined namespace
         try:
-            result = eval(stripped, {"__builtins__": {}}, eval_ns)  # noqa: S307
+            parsed = ast.parse(stripped, mode="eval").body
+            if not isinstance(parsed, ast.Call) or not isinstance(parsed.func, ast.Name):
+                return value
+            if parsed.func.id != candidate_name:
+                return value
+
+            args: list[Any] = []
+            for arg in parsed.args:
+                if isinstance(arg, ast.Starred):
+                    expanded = self._safe_constructor_arg(arg.value, session.session_locals)
+                    if type(expanded) not in (list, tuple):
+                        raise ValueError("constructor *args must be an exact list or tuple")
+                    args.extend(expanded)
+                else:
+                    args.append(self._safe_constructor_arg(arg, session.session_locals))
+            kwargs: dict[str, Any] = {}
+            for keyword in parsed.keywords:
+                if keyword.arg is None:
+                    expanded = self._safe_constructor_arg(keyword.value, session.session_locals)
+                    if type(expanded) is not dict or not all(type(key) is str for key in expanded):
+                        raise ValueError("constructor **kwargs must be a string-keyed dict")
+                    kwargs.update(expanded)
+                else:
+                    kwargs[keyword.arg] = self._safe_constructor_arg(
+                        keyword.value, session.session_locals
+                    )
+
+            result = return_type(*args, **kwargs)
             get_harness_metrics().constructor_string_coerced(candidate_name)
             logger.debug(
                 "[CODEACT] Coerced constructor-call string %r into %s instance",
@@ -2058,7 +2222,7 @@ Standard Python builtins and agent instance (`self`) are available."""
             return result
         except Exception:
             logger.debug(
-                "[CODEACT] Failed to eval constructor string %r, returning as-is",
+                "[CODEACT] Failed to parse constructor string %r, returning as-is",
                 stripped[:80],
             )
             return value

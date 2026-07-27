@@ -279,6 +279,36 @@ class TestCodeActStrategyPydanticOutput:
         assert result.label == "positive"
 
     @pytest.mark.asyncio
+    async def test_pydantic_constructor_string_return_remains_compatible(self):
+        """A literal constructor string is still corrected without another LLM turn."""
+
+        class AnalysisResult(BaseModel):
+            score: int
+            label: str
+
+        class TestAgent(Agent, llm=_TEST_LLM):
+            @strategy(CodeActStrategy(config=CodeActConfig(max_iterations=1)))
+            async def analyze(self) -> AnalysisResult:
+                """Return the analysis result."""
+                ...
+
+        fake_llm = FakeLLMClient(
+            scripted_responses=[
+                _resp(
+                    "",
+                    tool_calls=[
+                        _return_result(result='AnalysisResult(score=85, label="positive")')
+                    ],
+                ),
+            ]
+        )
+
+        result = await TestAgent(llm=fake_llm).analyze()
+
+        assert result == AnalysisResult(score=85, label="positive")
+        assert fake_llm.call_count == 1
+
+    @pytest.mark.asyncio
     async def test_pydantic_validation_error_triggers_retry(self):
         """Test that Pydantic validation errors trigger regeneration."""
         from pydantic import BaseModel

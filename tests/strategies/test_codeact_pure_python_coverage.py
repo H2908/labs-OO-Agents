@@ -4177,7 +4177,7 @@ class TestCodeActGenerationIdNone:
 
 
 class TestMaybeEvalConstructorString:
-    """Tests for _maybe_eval_constructor_string constructor-call coercion."""
+    """Tests for safe constructor-call string coercion."""
 
     def _make_session(self, **locals_):
         """Create a mock session with given session_locals."""
@@ -4186,7 +4186,7 @@ class TestMaybeEvalConstructorString:
         return session
 
     def test_basic_constructor_with_type_in_locals(self):
-        """Should eval 'Answer(answer=1, reason="test")' when Answer is in locals."""
+        """Should parse 'Answer(answer=1, reason="test")' when Answer is in locals."""
         from pydantic import BaseModel
 
         class Answer(BaseModel):
@@ -4203,7 +4203,7 @@ class TestMaybeEvalConstructorString:
         assert result.reason == "the minimum"
 
     def test_constructor_with_type_injected_from_return_type(self):
-        """Should inject return_type into eval ns when not in session_locals."""
+        """Should construct the return type even when it is absent from session locals."""
         from pydantic import BaseModel
 
         class MyResult(BaseModel):
@@ -4220,7 +4220,7 @@ class TestMaybeEvalConstructorString:
         assert result.note == "computed"
 
     def test_constructor_with_variable_reference_in_args(self):
-        """Should resolve variables from session_locals inside constructor args."""
+        """Should resolve plain-data variables from session locals inside constructor args."""
         from pydantic import BaseModel
 
         class Answer(BaseModel):
@@ -4258,7 +4258,7 @@ class TestMaybeEvalConstructorString:
         assert result == "Unknown(x=1)"
 
     def test_eval_failure_returns_as_is(self):
-        """If eval raises, return original string."""
+        """If parsing fails, return the original string."""
         from pydantic import BaseModel
 
         class Answer(BaseModel):
@@ -4267,7 +4267,7 @@ class TestMaybeEvalConstructorString:
 
         strat = CodeActStrategy()
         session = self._make_session(Answer=Answer)
-        # Missing required field should raise ValidationError in eval
+        # Unknown argument names are not part of the data-only expression subset.
         result = strat._maybe_eval_constructor_string(
             'Answer(answer="not_an_int_but_coerced", reason=missing_var)', Answer, session
         )
@@ -4275,7 +4275,7 @@ class TestMaybeEvalConstructorString:
         assert result == 'Answer(answer="not_an_int_but_coerced", reason=missing_var)'
 
     def test_nested_parens_work(self):
-        """Nested parens in args should be handled by eval."""
+        """Deterministic helpers preserve common computed-argument coercion."""
         from pydantic import BaseModel
 
         class Answer(BaseModel):
@@ -4289,6 +4289,143 @@ class TestMaybeEvalConstructorString:
         )
         assert isinstance(result, Answer)
         assert result.answer == 1
+
+    def test_arbitrary_local_factory_is_not_called(self):
+        """A session-local callable cannot execute through constructor coercion."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+
+        calls: list[str] = []
+
+        def factory() -> Answer:
+            calls.append("executed")
+            return Answer(answer=42)
+
+        strat = CodeActStrategy()
+        session = self._make_session(factory=factory)
+        source = "factory()"
+        result = strat._maybe_eval_constructor_string(source, Answer, session)
+
+        assert result == source
+        assert calls == []
+
+    def test_session_callable_cannot_execute_as_constructor_argument(self):
+        """An expected constructor cannot invoke a callable planted by an earlier cell."""
+        from pydantic import BaseModel
+
+        class Answer(BaseModel):
+            answer: int
+
+        calls: list[str] = []
+
+        def trigger() -> int:
+            calls.append("executed")
+            return 42
+
+        strat = CodeActStrategy()
+        session = self._make_session(trigger=trigger)
+        source = "Answer(answer=trigger())"
+        result = strat._maybe_eval_constructor_string(source, Answer, session)
+
+        assert result == source
+        assert calls == []
+
+    def test_constructor_arguments_cannot_access_return_type_attributes(self):
+        """The expected type itself cannot be used as a reflection ladder."""
+
+        calls: list[str] = []
+
+        class Answer:
+            def __init__(self, answer: int):
+                self.answer = answer
+
+        Answer.marker = calls
+        strat = CodeActStrategy()
+        session = self._make_session()
+        source = 'Answer(answer=Answer.marker.append("executed") or 42)'
+        result = strat._maybe_eval_constructor_string(source, Answer, session)
+
+        assert result == source
+        assert calls == []
+
+    def test_non_pydantic_constructor_still_works(self):
+        """Opaque return types retain literal constructor-string compatibility."""
+
+        class Answer:
+            def __init__(self, answer: int, labels: tuple[str, ...]):
+                self.answer = answer
+                self.labels = labels
+
+        strat = CodeActStrategy()
+        session = self._make_session()
+        result = strat._maybe_eval_constructor_string(
+            'Answer(answer=-3, labels=("safe", "compatible"))', Answer, session
+        )
+
+        assert isinstance(result, Answer)
+        assert result.answer == -3
+        assert result.labels == ("safe", "compatible")
+
+    def test_constructor_arguments_preserve_object_references(self):
+        """Bare names and names in literal containers retain exact object identity."""
+
+        payload = object()
+
+        class Answer:
+            def __init__(self, direct: object, nested: list[object], mapping: dict[str, object]):
+                self.direct = direct
+                self.nested = nested
+                self.mapping = mapping
+
+        strat = CodeActStrategy()
+        session = self._make_session(payload=payload)
+        result = strat._maybe_eval_constructor_string(
+            'Answer(direct=payload, nested=[payload], mapping={"item": payload})',
+            Answer,
+            session,
+        )
+
+        assert isinstance(result, Answer)
+        assert result.direct is payload
+        assert result.nested[0] is payload
+        assert result.mapping["item"] is payload
+
+    def test_pydantic_constructor_preserves_arbitrary_type_reference(self):
+        """Pydantic arbitrary-type fields keep the original REPL object."""
+        from pydantic import BaseModel, ConfigDict
+
+        class Payload:
+            pass
+
+        class Answer(BaseModel):
+            model_config = ConfigDict(arbitrary_types_allowed=True)
+            data: Payload
+
+        payload = Payload()
+        strat = CodeActStrategy()
+        session = self._make_session(payload=payload)
+        result = strat._maybe_eval_constructor_string("Answer(data=payload)", Answer, session)
+
+        assert isinstance(result, Answer)
+        assert result.data is payload
+
+    def test_constructor_star_args_preserve_object_references(self):
+        """Exact list/tuple expansion retains references without invoking custom iterators."""
+
+        payload = object()
+
+        class Answer:
+            def __init__(self, direct: object):
+                self.direct = direct
+
+        strat = CodeActStrategy()
+        session = self._make_session(args=(payload,))
+        result = strat._maybe_eval_constructor_string("Answer(*args)", Answer, session)
+
+        assert isinstance(result, Answer)
+        assert result.direct is payload
 
     def test_non_identifier_prefix_returns_as_is(self):
         """String starting with non-identifier before parens should return as-is."""
