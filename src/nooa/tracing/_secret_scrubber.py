@@ -24,6 +24,37 @@ logger = logging.getLogger(__name__)
 
 REDACTED = "[REDACTED]"
 
+_SENSITIVE_KEYS = frozenset(
+    {
+        "authorization",
+        "proxy_authorization",
+        "api_key",
+        "x_api_key",
+        "access_token",
+        "refresh_token",
+        "auth_token",
+        "session_token",
+        "id_token",
+        "client_secret",
+        "client_assertion",
+        "password",
+        "passwd",
+        "private_key",
+        "secret_key",
+        "code_verifier",
+        "cookie",
+        "set_cookie",
+    }
+)
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
+    return normalized in _SENSITIVE_KEYS or any(
+        normalized.endswith(f"_{sensitive}") for sensitive in _SENSITIVE_KEYS
+    )
+
+
 # ---------------------------------------------------------------------------
 # Regex-based secret patterns — high precision, low false positives
 # ---------------------------------------------------------------------------
@@ -62,8 +93,9 @@ _SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "generic_api_key",
         re.compile(
             r"(?:api[_-]?key|api[_-]?token|auth[_-]?token|access[_-]?token|"
+            r"client[_-]?secret|refresh[_-]?token|code[_-]?verifier|"
             r"secret[_-]?key|private[_-]?key|password|passwd)"
-            r"[\"\']?\s*[=:]+\s*[\"\'\s]*(?P<secret>[A-Za-z0-9_.\-/+=]{20,})",
+            r"[\"\']?\s*[=:]+\s*[\"\'\s]*(?P<secret>[A-Za-z0-9_.\-/+=]{1,})",
             re.IGNORECASE,
         ),
     ),
@@ -153,7 +185,7 @@ def scrub_string(text: str) -> tuple[str, int]:
     span processing). Returns the original string unchanged with a count of 0
     if no secrets are found (fast path).
     """
-    if not text or len(text) < 10:
+    if not text:
         return text, 0
 
     count = 0
@@ -176,12 +208,25 @@ def scrub_string(text: str) -> tuple[str, int]:
 def scrub_value(value: Any) -> tuple[Any, int]:
     """Scrub secrets from a span attribute value.
 
-    Handles strings and sequences of strings. Other types pass through.
+    Handles strings, mappings, and sequences. Values under credential-bearing
+    keys are always replaced, including short or provider-specific secrets.
     Returns ``(scrubbed_value, redaction_count)`` where the count is the
     number of secrets redacted within this value.
     """
     if isinstance(value, str):
         return scrub_string(value)
+    if isinstance(value, dict):
+        scrubbed: dict[Any, Any] = {}
+        count = 0
+        for key, item in value.items():
+            if _is_sensitive_key(key):
+                scrubbed[key] = REDACTED
+                stats.record("sensitive_key")
+                count += 1
+            else:
+                scrubbed[key], n = scrub_value(item)
+                count += n
+        return scrubbed, count
     if isinstance(value, (list, tuple)):
         new_items = []
         count = 0
@@ -223,7 +268,11 @@ try:
                 redacted_count = 0
 
                 for key, value in span.attributes.items():
-                    new_value, n = scrub_value(value)
+                    if _is_sensitive_key(key):
+                        new_value, n = REDACTED, 1
+                        stats.record("sensitive_key")
+                    else:
+                        new_value, n = scrub_value(value)
                     scrubbed[key] = new_value
                     redacted_count += n
 
