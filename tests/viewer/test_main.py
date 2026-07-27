@@ -130,6 +130,33 @@ def client(tmp_path, monkeypatch):
         del otlp_store._write_tls.conn
 
 
+def test_api_routes_require_configured_bearer_token(client, monkeypatch):
+    monkeypatch.setenv("NOOA_VIEWER_AUTH_TOKEN", "test-viewer-token")
+
+    read_response = client.get("/api/version")
+    write_response = client.post("/api/refresh")
+    assert read_response.status_code == 401
+    assert write_response.status_code == 401
+    assert read_response.headers["www-authenticate"] == "Bearer"
+
+    authorized = client.get(
+        "/api/version", headers={"Authorization": "Bearer test-viewer-token"}
+    )
+    assert authorized.status_code == 200
+
+
+def test_cors_rejects_unconfigured_origin(client):
+    response = client.options(
+        "/api/version",
+        headers={
+            "Origin": "https://attacker.example",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
+
+
 def _seed_session(db: sqlite3.Connection, session_id: str = "sess1") -> None:
     db.execute(
         "INSERT INTO sessions (session_id, experiment, span_count, modified) VALUES (?, 'default', 0, 0)",
