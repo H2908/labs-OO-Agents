@@ -95,13 +95,10 @@ uv add "eval_pipeline @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@ma
 
 ## Quick Start
 
-## WARNING
-This is a research tool that can be configured to execute LLM-generated code. LLM-generated code may take dangerous or unwanted actions, incuding sending private data to uncontrolled locations, deleting files, or modifying its environments.  Ensure you run NOOA agents in a sandboxed environment isolated from your primary filesystem, such as [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell).
+### ⚠️ Before Starting: safety note
+NOOA is **research software**, and agents can be configured to execute LLM-generated code. LLM-generated code may take dangerous or unwanted actions, incuding sending private data to uncontrolled locations, deleting files, or modifying its environments.  Ensure you run NOOA agents in a sandboxed environment isolated from your primary filesystem, such as [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell).
 
-> **Research software**  NOOA is research software, not production. We welcome contributions and fixes, but expect rough edges. 
-
-
-### Choose a model
+### 1. Choose a model
 
 Choose from supported hosted or local [LiteLLM-supported](https://docs.litellm.ai/) model:
 
@@ -114,7 +111,7 @@ llm = get_llm_client("ollama_chat/qwen3:1.7b", api_base="http://localhost:11434"
 llm = get_llm_client("hosted_vllm/Qwen/Qwen3-1.7B", api_base="http://localhost:8000/v1")  # vLLM (no key)
 ```
 
-### Your first agent
+### 2. Your first agent
 
 ***Agents are Python objects***. Methods with `...` bodies are **generation methods** — implemented at runtime by an LLM-driven strategy. The signature defines the contract; the docstring is the prompt.
 
@@ -151,7 +148,7 @@ Rename `analyze_feedback` to `analyze_feedback_briefly` and the output changes �
 
 Ready for more? See [**examples/**](examples/README.md) for the full progressive tutorial — structured output, tools, strategies, tracing, context blocks, MCP, and more.
 
-### See what your agent is doing
+### 3. See what your agent is doing
 
 Every LLM call, code execution, and method invocation is traced by default — orchestrators, generation methods, and helpers, with parent-child spans preserved. If you installed the CLI and viewer dependencies, start the trace viewer and open the run in your browser:
 
