@@ -3,9 +3,24 @@
 """Unified AST validation for agent-generated code.
 
 This module provides a single entry point for all code validation:
-- SecurityValidator: Prevents security risks (forbidden builtins, imports, escapes)
+- SecurityValidator: Guardrails against common footguns (forbidden builtins,
+  restricted imports, direct class/dunder mutation)
 - BlockingCallValidator: Prevents blocking calls that freeze the event loop
 - REPLPolicyValidator: Enforces REPL-style coding conventions
+
+Security model — read before extending:
+    These validators are **guardrails, not a security boundary**. They operate on
+    a static AST and reduce the chance that an LLM *accidentally* corrupts runtime
+    state, freezes the event loop, or reaches for a surprising module. They do
+    **not** and **cannot** contain adversarial code: a static Python checker is
+    trivially bypassable (e.g. ``open()`` for arbitrary file I/O, dynamic module
+    loading via ``importlib.util``/``importlib.machinery``, reflection, C-extension
+    loading). Do not treat the deny-lists as a jail or add checks under the belief
+    that they close a real escape — that is unwinnable whack-a-mole.
+
+    The actual containment boundary is OS-level isolation (container / VM / gVisor,
+    e.g. NVIDIA OpenShell). Run agents that execute generated code inside one.
+    See the README security note and ``runtime/restrictions.py``.
 
 Usage:
     validator = UnifiedCodeValidator()
@@ -161,7 +176,9 @@ FORBIDDEN_ATTR_CALLS = frozenset(
     }
 )
 
-# Dangerous dunder attributes that enable sandbox escapes
+# Dunder attributes commonly used to reach runtime internals (introspection
+# ladders like __class__ -> __subclasses__). Blocking them trims easy footguns;
+# it is not a containment guarantee (see the module docstring's security model).
 DANGEROUS_DUNDER_ATTRS = frozenset(
     {
         "__class__",
@@ -177,13 +194,18 @@ DANGEROUS_DUNDER_ATTRS = frozenset(
 
 
 class SecurityValidator:
-    """Validates code for security risks.
+    """Guardrail checks over generated code (not a security boundary).
+
+    Flags common footguns so the LLM fails fast with a clear message rather than
+    corrupting runtime state or silently doing something surprising. This is
+    defense-in-depth, not containment — see the module docstring's security
+    model. Real isolation comes from running the agent in an OS-level sandbox.
 
     Checks for:
     - Forbidden builtins (exec, eval, compile, __import__, input, breakpoint, globals, locals)
     - Restricted/blocked imports (modules in restricted_imports or blocked_modules deny lists)
     - Import * (always forbidden)
-    - Dangerous dunder attribute access (__class__, __bases__, etc.)
+    - Direct dunder attribute access (__class__, __bases__, etc.)
     - Recursive self-calls (infinite recursion prevention)
     - Aliased forbidden builtins
     - Forbidden attribute calls (set_restricted_imports, get_restricted_imports)

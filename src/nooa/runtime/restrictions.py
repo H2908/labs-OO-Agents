@@ -4,6 +4,15 @@
 
 Single source of truth for blocked modules, blocked calls, and restricted modules.
 Consumed by CodeActConfig (defaults), exec_globals stripping, and BlockingCallValidator.
+
+These lists are **guardrails, not a security boundary.** Their jobs are to keep
+generated code from freezing the event loop (blocked calls/modules) and to trim
+common footguns — not to contain adversarial code. A static deny-list over Python
+cannot do that: ``open()`` gives arbitrary file I/O, ``importlib.util`` /
+``importlib.machinery`` load modules straight from a path, and reflection reaches
+the rest. Extending these lists to "close an escape" is unwinnable whack-a-mole.
+The real containment boundary is OS-level isolation (container / VM, e.g. NVIDIA
+OpenShell); run agents that execute generated code inside one. See the README.
 """
 
 import types
@@ -79,6 +88,11 @@ DEFAULT_BLOCKED_CALLS: dict[str, frozenset[str]] = {
     "threading": frozenset({"Thread.join", "Lock.acquire", "Event.wait", "Condition.wait"}),
     "multiprocessing": frozenset({"Process.join", "Queue.get", "Queue.put"}),
     "asyncio": frozenset({"run", "run_coroutine_threadsafe", "run_until_complete", "run_forever"}),
+    # Blocking import_module() by name trims one accidental way to pull in a
+    # blocked module past the AST import check. It is NOT a security control:
+    # importlib.util.spec_from_file_location(), importlib.machinery.SourceFileLoader(),
+    # and plain open() all remain viable, by design (see module docstring — these
+    # lists are guardrails, not a jail). Containment is the OS-level sandbox.
     "importlib": frozenset({"import_module"}),
 }
 
@@ -106,6 +120,7 @@ class RestrictionsConfig(BaseModel):
     Tier 3 — **allowed** (everything else):
         Any installed module can be imported freely.
 
+    This is a guardrail, not a containment boundary — see the module docstring.
     Keeps defaults co-located with the constants they reference.
     Embed in strategy configs (e.g. CodeActConfig) for composition.
     """
