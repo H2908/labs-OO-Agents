@@ -45,6 +45,7 @@ def sse_client() -> MCPSSEClient:
     """Create an SSE client for testing."""
     return MCPSSEClient(
         url="http://localhost:8000",
+        headers={"Authorization": "Bearer token"},
         tool_call_timeout=timedelta(seconds=45),
     )
 
@@ -253,11 +254,24 @@ def test_sse_client_properties(sse_client: MCPSSEClient):
     """MCPSSEClient properties return correct values."""
     assert sse_client.transport == "sse"
     assert sse_client.url == "http://localhost:8000"
+    assert sse_client.headers == {"Authorization": "Bearer token"}
     assert sse_client.tool_call_timeout == timedelta(seconds=45)
 
     config = sse_client.server_config
     assert config["transport"] == "sse"
     assert config["url"] == "http://localhost:8000"
+    assert config["headers"] == {"Authorization": "Bearer token"}
+
+
+def test_sse_client_preserves_positional_timeout():
+    """The existing second positional argument remains the tool-call timeout."""
+    client = MCPSSEClient(
+        "http://localhost:8000",
+        timedelta(seconds=7),
+    )
+
+    assert client.tool_call_timeout == timedelta(seconds=7)
+    assert client.headers == {}
 
 
 def test_streamable_http_client_properties(streamable_http_client: MCPStreamableHTTPClient):
@@ -326,6 +340,35 @@ async def test_connect_context_manager(
             async with client.connect_to_server() as session:
                 assert session is not None
                 mock_client_session.initialize.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_sse_headers_passed_to_transport(
+    mock_mcp_transport: tuple[MagicMock, MagicMock],
+    mock_client_session: AsyncMock,
+):
+    """SSE clients forward custom headers to the transport."""
+    client = create_mcp_client(
+        "sse",
+        url="https://example.test/sse",
+        headers={"Authorization": "Bearer token"},
+    )
+    mock_read, mock_write = mock_mcp_transport
+
+    with (
+        patch("nooa.mcp.client.sse_client") as mock_sse,
+        patch("nooa.mcp.client.ClientSession") as mock_session_class,
+    ):
+        mock_sse.return_value.__aenter__.return_value = (mock_read, mock_write)
+        mock_session_class.return_value.__aenter__.return_value = mock_client_session
+
+        async with client.connect_to_server():
+            pass
+
+    mock_sse.assert_called_once_with(
+        url="https://example.test/sse",
+        headers={"Authorization": "Bearer token"},
+    )
 
 
 @pytest.mark.asyncio
