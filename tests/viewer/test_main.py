@@ -139,9 +139,7 @@ def test_api_routes_require_configured_bearer_token(client, monkeypatch):
     assert write_response.status_code == 401
     assert read_response.headers["www-authenticate"] == "Bearer"
 
-    authorized = client.get(
-        "/api/version", headers={"Authorization": "Bearer test-viewer-token"}
-    )
+    authorized = client.get("/api/version", headers={"Authorization": "Bearer test-viewer-token"})
     assert authorized.status_code == 200
 
 
@@ -257,6 +255,17 @@ class TestJournalMessagesEndpoint:
         r2 = client.post("/v1/journal/messages", json=payload)
         assert r1.status_code == 200
         assert r2.status_code == 200
+
+    def test_oversized_body_is_rejected_before_json_decode(self, client, monkeypatch):
+        monkeypatch.setattr(main_module, "_INGEST_MAX_BODY_BYTES", 32)
+
+        response = client.post(
+            "/v1/journal/messages",
+            content=b"x" * 33,
+            headers={"Content-Type": "application/json"},
+        )
+
+        assert response.status_code == 413
 
 
 # ---------------------------------------------------------------------------

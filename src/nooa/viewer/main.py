@@ -10,6 +10,7 @@ for client-side routing.
 import asyncio
 import hmac
 import ipaddress
+import json
 import logging
 import os
 import time
@@ -34,6 +35,30 @@ from .trace_routes import router as trace_router  # noqa: E402
 
 log = logging.getLogger(__name__)
 
+_INGEST_MAX_BODY_BYTES = 16 * 1024 * 1024
+_INGEST_QUEUE_MAX_ITEMS = 64
+
+
+async def _read_limited_body(request: Request) -> bytes:
+    """Read at most ``_INGEST_MAX_BODY_BYTES`` without buffering more."""
+    raw_length = request.headers.get("content-length")
+    if raw_length and raw_length.isdecimal() and int(raw_length) > _INGEST_MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="ingest body too large")
+
+    chunks: list[bytes] = []
+    body_size = 0
+    async for chunk in request.stream():
+        body_size += len(chunk)
+        if body_size > _INGEST_MAX_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="ingest body too large")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _read_limited_json(request: Request) -> object:
+    return json.loads(await _read_limited_body(request))
+
+
 # ---------------------------------------------------------------------------
 # Write queue — decouple HTTP ingest latency from SQLite write latency.
 #
@@ -46,8 +71,8 @@ log = logging.getLogger(__name__)
 # at a time, the event loop is never blocked, and HTTP latency is near-zero.
 # ---------------------------------------------------------------------------
 
-_ingest_queue: asyncio.Queue[bytes] = asyncio.Queue()
-_QUEUE_WARN_THRESHOLD = 500  # log a warning if the backlog grows this large
+_ingest_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=_INGEST_QUEUE_MAX_ITEMS)
+_QUEUE_WARN_THRESHOLD = 48
 
 # Single-writer thread pool: exactly one thread owns the write connection.
 # Using max_workers=1 ensures serial SQLite writes with no concurrent access.
@@ -216,21 +241,17 @@ async def otlp_ingest(request: Request):
     (3-5 MB payloads) don't block the event loop while parsing.
     """
     try:
-        body_bytes = await request.body()
+        body_bytes = await _read_limited_body(request)
     except ClientDisconnect:
-        # BSP exporter timed out and closed the connection before we read the
-        # body — log at WARNING (not ERROR) since this is a transient backpressure
-        # signal, not a bug.  The BSP will retry on the next export cycle.
         log.warning("[otlp_ingest] Client disconnected before body was read — BSP may retry")
         return JSONResponse(status_code=499, content={"error": "client disconnected"})
     qsize = _ingest_queue.qsize()
     if qsize >= _QUEUE_WARN_THRESHOLD:
-        log.warning(
-            "[otlp_ingest] Write queue backlog: %d pending — "
-            "SQLite may not be keeping up with ingest rate.",
-            qsize,
-        )
-    await _ingest_queue.put(body_bytes)
+        log.warning("[otlp_ingest] Write queue backlog: %d pending", qsize)
+    try:
+        _ingest_queue.put_nowait(body_bytes)
+    except asyncio.QueueFull:
+        return JSONResponse(status_code=503, content={"error": "ingest queue is full"})
     return JSONResponse(content={"queued": True})
 
 
@@ -278,7 +299,8 @@ async def journal_messages_ingest(request: Request):
     """
     import sqlite3
 
-    body = await request.json()
+    body = await _read_limited_json(request)
+
     if not isinstance(body, list):
         return JSONResponse(
             status_code=400,
@@ -315,7 +337,8 @@ async def journal_call_ingest(request: Request):
     """
     import sqlite3
 
-    body = await request.json()
+    body = await _read_limited_json(request)
+
     if not isinstance(body, dict) or not body.get("call_id") or not body.get("session_id"):
         return JSONResponse(
             status_code=400,
@@ -361,7 +384,8 @@ async def journal_blocks_ingest(request: Request):
     """
     import sqlite3
 
-    body = await request.json()
+    body = await _read_limited_json(request)
+
     if not isinstance(body, list):
         return JSONResponse(
             status_code=400,
