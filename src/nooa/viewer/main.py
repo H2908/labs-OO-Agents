@@ -8,6 +8,8 @@ for client-side routing.
 """
 
 import asyncio
+import hmac
+import ipaddress
 import logging
 import os
 import time
@@ -15,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.requests import ClientDisconnect
@@ -146,19 +148,55 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NVIDIA OO Agents Viewer", version="2.0.0", lifespan=lifespan)
 
+
+def _require_viewer_authorization(request: Request) -> None:
+    """Authorize a protected viewer API route when an auth token is configured."""
+    expected = os.environ.get("NOOA_VIEWER_AUTH_TOKEN")
+    if not expected:
+        client_host = request.client.host if request.client else ""
+        try:
+            is_loopback = ipaddress.ip_address(client_host).is_loopback
+        except ValueError:
+            # Starlette's in-process test transport uses this non-network host.
+            is_loopback = client_host == "testclient"
+        if is_loopback:
+            return
+        raise HTTPException(
+            status_code=403,
+            detail="set NOOA_VIEWER_AUTH_TOKEN before exposing the viewer",
+        )
+
+    authorization = request.headers.get("Authorization", "")
+    if not hmac.compare_digest(authorization, f"Bearer {expected}"):
+        raise HTTPException(
+            status_code=401,
+            detail="viewer authorization required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get(
+        "NOOA_VIEWER_CORS_ORIGINS", "http://localhost:5001,http://127.0.0.1:5001"
+    ).split(",")
+    if origin.strip()
+]
+_protected = [Depends(_require_viewer_authorization)]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "X-Session-Id"],
 )
 
-app.include_router(trace_router)
-app.include_router(eval_router)
-app.include_router(annotation_router)
-app.include_router(explorer_router)
-app.include_router(memory_router)
+app.include_router(trace_router, dependencies=_protected)
+app.include_router(eval_router, dependencies=_protected)
+app.include_router(annotation_router, dependencies=_protected)
+app.include_router(explorer_router, dependencies=_protected)
+app.include_router(memory_router, dependencies=_protected)
 
 
 # ============================================================================
@@ -166,7 +204,7 @@ app.include_router(memory_router)
 # ============================================================================
 
 
-@app.post("/v1/traces")
+@app.post("/v1/traces", dependencies=_protected)
 async def otlp_ingest(request: Request):
     """Accept OTLP JSON ExportTraceServiceRequest and queue for async SQLite write.
 
@@ -201,7 +239,7 @@ async def otlp_ingest(request: Request):
 # ============================================================================
 
 
-@app.post("/v1/sync")
+@app.post("/v1/sync", dependencies=_protected)
 async def sync_ingest():
     """Block until the ingest queue is fully drained and all spans are in SQLite.
 
@@ -228,7 +266,7 @@ async def sync_ingest():
 # ============================================================================
 
 
-@app.post("/v1/journal/messages")
+@app.post("/v1/journal/messages", dependencies=_protected)
 async def journal_messages_ingest(request: Request):
     """Accept a batch of content-addressed message records.
 
@@ -269,7 +307,7 @@ async def journal_messages_ingest(request: Request):
     return JSONResponse(content=result)
 
 
-@app.post("/v1/journal/calls")
+@app.post("/v1/journal/calls", dependencies=_protected)
 async def journal_call_ingest(request: Request):
     """Accept a single LLM call record with input/output hash lists.
 
@@ -309,7 +347,7 @@ async def journal_call_ingest(request: Request):
     return JSONResponse(content=result)
 
 
-@app.post("/v1/journal/blocks")
+@app.post("/v1/journal/blocks", dependencies=_protected)
 async def journal_blocks_ingest(request: Request):
     """Accept a batch of content-addressed message blocks for a session.
 
@@ -363,7 +401,7 @@ async def journal_blocks_ingest(request: Request):
     return JSONResponse(content=result)
 
 
-@app.get("/api/traces/{session_id:path}/calls")
+@app.get("/api/traces/{session_id:path}/calls", dependencies=_protected)
 def get_session_calls(session_id: str):
     """Return all LLM calls for a session with fully reconstructed messages."""
     if not otlp_store.session_exists(session_id):
@@ -376,7 +414,7 @@ def get_session_calls(session_id: str):
 # ============================================================================
 
 
-@app.post("/api/refresh")
+@app.post("/api/refresh", dependencies=_protected)
 def refresh_all():
     """Return current store stats."""
     stats = otlp_store.get_stats()
