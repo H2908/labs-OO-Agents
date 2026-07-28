@@ -123,6 +123,34 @@ async def test_persistent_namespace_across_cells():
         await ex.aclose()
 
 
+async def test_persistent_namespace_keeps_assignments_from_failed_cell():
+    ex = _executor()
+    try:
+        failed = await _run(ex, "answer = 41\nraise ValueError('boom')", 1)
+        assert not failed.success
+        assert isinstance(failed.error, ValueError)
+
+        resumed = await _run(ex, "answer + 1", 2)
+        assert resumed.success, resumed.error
+        assert resumed.returned_value == 42
+    finally:
+        await ex.aclose()
+
+
+async def test_persistent_namespace_keeps_assignments_before_return_result():
+    ex = _executor()
+    try:
+        signaled = await _run(ex, "answer = 41\nreturn_result(answer)", 1)
+        assert signaled.error is None
+        assert signaled.signal is not None
+
+        resumed = await _run(ex, "answer + 1", 2)
+        assert resumed.success, resumed.error
+        assert resumed.returned_value == 42
+    finally:
+        await ex.aclose()
+
+
 async def test_stdout_is_captured():
     ex = _executor()
     try:

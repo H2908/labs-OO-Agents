@@ -22,7 +22,7 @@ import io
 import linecache
 import types
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from nooa.events import _NO_RETURN, ExecutionResult, ExecutionSignal
 
@@ -185,12 +185,13 @@ async def run_cell_source(
             )
 
             exec(compile(wrapper, cell_filename, "exec"), namespace)
-            result_value = await namespace["__repl_wrapper__"]()
-
-            # Persist captured locals into the namespace for the next cell.
-            captured = namespace.pop("__repl_captured_locals__", {})
-            for k, v in captured.items():
-                namespace[k] = v
+            try:
+                result_value = await namespace["__repl_wrapper__"]()
+            finally:
+                # Keep REPL state even when the cell raises or returns via signal.
+                captured = namespace.pop("__repl_captured_locals__", {})
+                for k, v in captured.items():
+                    namespace[k] = v
 
             if has_explicit_return:
                 returned_value = result_value
@@ -198,7 +199,7 @@ async def run_cell_source(
                 returned_value = result_value
 
             # Re-bind top-level function defs so helpers persist by name.
-            func_defs = [
+            func_defs: list[ast.stmt] = [
                 n for n in tree.body if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)
             ]
             if func_defs:
@@ -210,7 +211,7 @@ async def run_cell_source(
                 fn = namespace.get(name)
                 if callable(fn):
                     with contextlib.suppress(AttributeError, TypeError):
-                        fn._generated_source = src
+                        cast(Any, fn)._generated_source = src
             defined_methods = {
                 name: namespace[name] for name in method_sources if callable(namespace.get(name))
             }
