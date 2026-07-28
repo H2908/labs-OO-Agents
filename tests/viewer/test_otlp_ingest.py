@@ -46,9 +46,13 @@ async def http_client(mock_store, tmp_path):
     The lifespan is NOT triggered (httpx limitation), so no worker task runs.
     Suitable for testing the endpoint handler in isolation.
     """
-    with patch("nooa.viewer.main.otlp_store", mock_store):
-        from nooa.viewer.main import app
+    from nooa.viewer.main import app
 
+    fresh_queue: asyncio.Queue = asyncio.Queue(maxsize=256)
+    with (
+        patch("nooa.viewer.main.otlp_store", mock_store),
+        patch("nooa.viewer.main._ingest_queue", fresh_queue),
+    ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             yield c
 
@@ -69,6 +73,38 @@ class TestOtlpIngestEndpoint:
         await http_client.post("/v1/traces", json={"resourceSpans": []})
         # Without a running worker, ingest_batch_write_bytes should NOT have been called yet.
         mock_store.ingest_batch_write_bytes.assert_not_called()
+
+    async def test_rejects_declared_body_over_limit_before_queueing(self, http_client):
+        from nooa.viewer import main
+
+        with patch.object(main, "_INGEST_MAX_BODY_BYTES", 32):
+            response = await http_client.post("/v1/traces", content=b"x" * 33)
+
+        assert response.status_code == 413
+        assert main._ingest_queue.empty()
+
+    async def test_rejects_chunked_body_over_limit(self, http_client):
+        from nooa.viewer import main
+
+        async def chunks():
+            yield b"x" * 20
+            yield b"x" * 20
+
+        with patch.object(main, "_INGEST_MAX_BODY_BYTES", 32):
+            response = await http_client.post("/v1/traces", content=chunks())
+
+        assert response.status_code == 413
+        assert main._ingest_queue.empty()
+
+    async def test_full_queue_returns_503(self, http_client):
+        from nooa.viewer import main
+
+        full_queue: asyncio.Queue = asyncio.Queue(maxsize=1)
+        full_queue.put_nowait(b"existing")
+        with patch.object(main, "_ingest_queue", full_queue):
+            response = await http_client.post("/v1/traces", content=b"{}")
+
+        assert response.status_code == 503
 
 
 # ---------------------------------------------------------------------------
