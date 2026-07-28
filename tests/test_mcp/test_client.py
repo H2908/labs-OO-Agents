@@ -372,6 +372,83 @@ async def test_sse_headers_passed_to_transport(
 
 
 @pytest.mark.asyncio
+async def test_streamable_http_applies_tool_call_timeout(
+    streamable_http_client: MCPStreamableHTTPClient,
+    mock_client_session: AsyncMock,
+):
+    """streamable-http gives httpx and the session the caller's tool_call_timeout.
+
+    The transport has no timeout arguments of its own and uses whatever client it is
+    handed, so an httpx client built without one caps every tool call at httpx's 5s
+    default no matter what tool_call_timeout says.
+    """
+    with (
+        patch("nooa.mcp.client.httpx.AsyncClient") as mock_async_client,
+        patch("nooa.mcp.client.streamable_http_client") as mock_http,
+        patch("nooa.mcp.client.ClientSession") as mock_session_class,
+    ):
+        mock_http.return_value.__aenter__.return_value = (MagicMock(), MagicMock(), MagicMock())
+        mock_session_class.return_value.__aenter__.return_value = mock_client_session
+
+        async with streamable_http_client.connect_to_server():
+            pass
+
+    timeout = mock_async_client.call_args.kwargs["timeout"]
+    assert timeout.read == 90
+    assert timeout.write == 90
+    # Opening the connection is not a tool call and keeps its own short budget.
+    assert timeout.connect == 5.0
+    assert mock_session_class.call_args.kwargs["read_timeout_seconds"] == timedelta(seconds=90)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "client_fixture, transport_patch, expected_timeout",
+    [
+        ("sse_client", "nooa.mcp.client.sse_client", timedelta(seconds=45)),
+        ("stdio_client", "nooa.mcp.client.stdio_client", timedelta(seconds=30)),
+    ],
+)
+async def test_session_enforces_tool_call_timeout(
+    client_fixture: str,
+    transport_patch: str,
+    expected_timeout: timedelta,
+    request: pytest.FixtureRequest,
+    mock_mcp_transport: tuple[MagicMock, MagicMock],
+    mock_client_session: AsyncMock,
+):
+    """Every transport hands tool_call_timeout to the session that enforces it."""
+    client: MCPBaseClient = request.getfixturevalue(client_fixture)
+
+    with (
+        patch(transport_patch) as mock_transport,
+        patch("nooa.mcp.client.ClientSession") as mock_session_class,
+    ):
+        mock_transport.return_value.__aenter__.return_value = mock_mcp_transport
+        mock_session_class.return_value.__aenter__.return_value = mock_client_session
+
+        async with client.connect_to_server():
+            pass
+
+    assert mock_session_class.call_args.kwargs["read_timeout_seconds"] == expected_timeout
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"transport": "stdio", "command": "python"},
+        {"transport": "sse", "url": "https://example.test/sse"},
+        {"transport": "streamable-http", "url": "https://example.test/mcp"},
+    ],
+)
+def test_create_mcp_client_forwards_tool_call_timeout(kwargs: dict[str, str]):
+    """create_mcp_client is the documented entry point and must pass the timeout on."""
+    client = create_mcp_client(tool_call_timeout=timedelta(seconds=7), **kwargs)
+
+    assert client.tool_call_timeout == timedelta(seconds=7)
+
+
+@pytest.mark.asyncio
 async def test_streamable_http_connect_context_manager(
     streamable_http_client: MCPStreamableHTTPClient,
     mock_client_session: AsyncMock,
@@ -439,7 +516,8 @@ async def test_streamable_http_headers_passed_to_httpx_client(
                     pass
 
                 # Verify httpx.AsyncClient was created with expected headers
-                mock_httpx_client.assert_called_once_with(headers=expected_headers)
+                mock_httpx_client.assert_called_once()
+                assert mock_httpx_client.call_args.kwargs["headers"] == expected_headers
 
 
 def test_dynamic_method_supports_json_container_defaults():
