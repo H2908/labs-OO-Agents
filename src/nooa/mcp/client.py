@@ -67,15 +67,18 @@ class MCPSSEClient(MCPBaseClient):
     Args:
         url: The URL of the MCP server
         tool_call_timeout: Timeout for tool calls
+        headers: Optional custom HTTP headers to include in requests (e.g., for authentication)
     """
 
     def __init__(
         self,
         url: str,
         tool_call_timeout: timedelta = timedelta(seconds=60),
+        headers: dict[str, str] | None = None,
     ):
         super().__init__(tool_call_timeout=tool_call_timeout)
         self._url = url
+        self._headers = headers or {}
 
     @property
     def transport(self) -> Literal["sse", "stdio", "streamable-http"]:
@@ -87,6 +90,7 @@ class MCPSSEClient(MCPBaseClient):
         """Return the server configuration."""
         return {
             "url": self._url,
+            "headers": self._headers,
             "transport": self.transport,
         }
 
@@ -94,6 +98,11 @@ class MCPSSEClient(MCPBaseClient):
     def url(self) -> str:
         """Return the server URL."""
         return self._url
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """Return the custom headers configured for this client."""
+        return self._headers
 
     @asynccontextmanager
     @override
@@ -107,7 +116,10 @@ class MCPSSEClient(MCPBaseClient):
             RuntimeError: If session initialization fails (MCP protocol error)
         """
         async with (
-            sse_client(url=self._url) as (read, write),
+            sse_client(
+                url=self._url,
+                headers=self._headers if self._headers else None,
+            ) as (read, write),
             ClientSession(read, write) as session,
         ):
             await session.initialize()
@@ -320,7 +332,7 @@ def create_mcp_client(
         case "sse":
             if url is None:
                 raise ValueError("url must be provided for sse transport")
-            return MCPSSEClient(url=url)
+            return MCPSSEClient(url=url, headers=headers)
         case "streamable-http":
             if url is None:
                 raise ValueError("url must be provided for streamable-http transport")
