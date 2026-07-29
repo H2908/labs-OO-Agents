@@ -47,11 +47,13 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
+      # Mirrors the publish workflow's build exactly (--no-sources included) so
+      # this job stays a real canary for release-build breakage.
       - name: Build all packages
         run: |
           rm -rf dist
           for pkg in nooa nooa-cli nooa-memory nooa-bench; do
-            uv build --package "$pkg" --out-dir dist
+            uv build --no-sources --package "$pkg" --out-dir dist
           done
       - name: Upload wheels
         uses: actions/upload-artifact@v4
