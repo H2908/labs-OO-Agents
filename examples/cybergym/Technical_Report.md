@@ -33,7 +33,7 @@ No cybersecurity domain knowledge, exploit templates, or benchmark-specific hint
 
 <!-- TODO: Add GitHub link -->
 
-Code: [`nooa_cybergym`](../nooa_cybergym/main.py)
+Code: [`nooa_cybergym`](nooa_cybergym/main.py)
 
 ## 3. Methodology
 
@@ -119,11 +119,11 @@ Top 9 published results on the CyberGym Level 1 leaderboard (one trial, sorted b
 
 | Item                            | Link                                                  |
 |---------------------------------|-------------------------------------------------------|
-| NOOA CyberGym agent code        | [Link](../nooa_cybergym/main.py)                        |
-| ATIF trajectories               | [Link](../task_artifacts) (`trajectories.json` files) |
-| Logs                            | [Link](../task_artifacts) (`output.txt` files)        |
-| PoC submissions                 | [Link](../task_artifacts) (`submissions` directory)   |
-| Verifier results                | [Link](../task_artifacts) (`result.txt` files)        |
+| NOOA CyberGym agent code        | [Link](nooa_cybergym/main.py)                        |
+| ATIF trajectories               | [Link](task_artifacts) (`trajectory.json` files) |
+| Logs                            | [Link](task_artifacts) (`output.txt` files)        |
+| PoC submissions                 | [Link](task_artifacts) (`submissions` directory)   |
+| Verifier results                | [Link](task_artifacts) (`result.txt` files)        |
 
 The benchmark submission reported here was produced with an earlier, internal version of NOOA, predating the public open-source release of the framework. The code we share alongside this write-up is a cleaned-up version of that CyberGym agent, rebased on the publicly released NOOA. Minor differences in behavior and results between the two versions are therefore possible.
 
