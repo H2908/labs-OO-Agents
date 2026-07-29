@@ -51,11 +51,24 @@ Publishing the release triggers the workflow, which:
 2. Fails the run if the built version does not match the tag, or is a `.devN`
    version (which means the tag was not reachable from the checked-out commit).
 3. Smoke-tests the wheels in a clean venv (imports + `nooa --version`).
-4. Uploads to PyPI via **Trusted Publishing** — no API tokens.
+4. Uploads to PyPI via **Trusted Publishing** (`uv publish`) — no API tokens.
 5. Attaches the wheels and sdists to the GitHub Release.
 
-The upload waits on the `pypi` GitHub Environment, so you can require a manual
-approval there if you want a second pair of eyes before the irreversible step.
+Each upload waits on its `pypi-<package>` GitHub Environment, so a required
+reviewer there gives a second pair of eyes before the irreversible step.
+
+> **Why no third-party actions.** Every `uses:` in `publish.yml` is an
+> `actions/*` action. This org enforces a GitHub Actions allowlist, and a
+> disallowed action fails the *entire workflow* at startup — that is what left
+> CI dead for eight days (PR #50). A publish workflow that cannot start is one
+> that silently never ships, so uv is installed from a pinned install script
+> and does the upload itself.
+>
+> The tradeoff is **no PEP 740 attestations**: `uv publish` uploads them but
+> [does not generate them](https://docs.astral.sh/uv/guides/package/), and the
+> action that does (`pypa/gh-action-pypi-publish`) may not be allowlisted.
+> Worth revisiting if it is added to the allowlist, or once uv can generate
+> them. Trusted Publishing itself is unaffected.
 
 ### Dry run against TestPyPI
 

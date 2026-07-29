@@ -5,6 +5,13 @@
 # Auth: PyPI Trusted Publishing (OIDC). No API tokens, no repo secrets.
 #
 # `workflow_dispatch` runs the same build against TestPyPI for a dry run.
+#
+# Every `uses:` here is an `actions/*` action, i.e. GitHub-created. That is
+# deliberate: this org enforces an Actions allowlist, and a disallowed action
+# fails the *entire workflow* at startup (see PR #50 — one blocked action left
+# CI dead for 8 days). A publish workflow that cannot start is a publish
+# workflow that silently never ships. uv is installed from a pinned, versioned
+# install script and does the upload itself via `uv publish`.
 name: Publish
 
 on:
@@ -20,6 +27,11 @@ on:
 
 permissions: {}
 
+env:
+  # Pinned: the install script is fetched at runtime, so an unversioned URL
+  # would make every run depend on whatever uv ships that day.
+  UV_VERSION: "0.11.4"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,9 +41,10 @@ jobs:
           fetch-depth: 0  # tags needed for uv-dynamic-versioning
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
+        run: |
+          set -euo pipefail
+          curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # --no-sources: build with `tool.uv.sources` disabled, so the build is
       # exercised the way a non-uv consumer's build backend would see it. Without
@@ -125,10 +138,20 @@ jobs:
           cp dist/"${PKG//-/_}"-* upload/
           test "$(ls upload | wc -l)" -eq 2  # exactly one wheel + one sdist
           ls -l upload
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: upload/
-          repository-url: https://test.pypi.org/legacy/
+      - name: Install uv
+        run: |
+          set -euo pipefail
+          curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # --trusted-publishing always: never silently fall back to looking for a
+      # token if the OIDC exchange fails. Fail instead, so a broken publisher
+      # config surfaces as an error rather than an auth prompt.
+      - name: Publish to TestPyPI
+        run: |
+          uv publish --trusted-publishing always \
+            --publish-url https://test.pypi.org/legacy/ \
+            --check-url https://test.pypi.org/simple/ \
+            upload/*
 
   publish-pypi:
     needs: build
@@ -160,9 +183,23 @@ jobs:
           cp dist/"${PKG//-/_}"-* upload/
           test "$(ls upload | wc -l)" -eq 2  # exactly one wheel + one sdist
           ls -l upload
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: upload/
+      - name: Install uv
+        run: |
+          set -euo pipefail
+          curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # --trusted-publishing always: never silently fall back to looking for a
+      # token if the OIDC exchange fails. Fail instead, so a broken publisher
+      # config surfaces as an error rather than an auth prompt.
+      #
+      # --check-url makes a re-run idempotent: already-uploaded files are
+      # skipped rather than erroring. Matters because `fail-fast: false` means
+      # a partial publish is a state you can land in and need to resume from.
+      - name: Publish to PyPI
+        run: |
+          uv publish --trusted-publishing always \
+            --check-url https://pypi.org/simple/ \
+            upload/*
 
   # Attach the built wheels to the GitHub Release so `pip install <url>` and
   # air-gapped consumers get the exact artifacts that went to PyPI.
