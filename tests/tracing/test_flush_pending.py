@@ -139,7 +139,13 @@ def test_pending_threads_self_evict_when_post_returns():
     process that never calls ``flush_pending`` doesn't leak."""
 
     def fast_post(*_args, **_kwargs):
-        return None
+        from unittest.mock import MagicMock
+
+        resp = MagicMock()
+        resp.status = 200
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = MagicMock(return_value=False)
+        return resp
 
     with patch(
         "nooa.tracing._litellm_journal.urllib.request.urlopen",
