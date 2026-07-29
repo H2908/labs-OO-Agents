@@ -87,7 +87,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # full history so the scan covers all commits
+      # Invokes the gitleaks binary directly rather than gitleaks/gitleaks-action.
+      # That action is not on this org's GitHub Actions allowlist, and a
+      # disallowed action fails the *entire workflow* at startup — which is why
+      # every CI run since 2026-07-21 was a 0-second `startup_failure` and no
+      # lint, test, or build job ran at all.
+      #
+      # Pinned to an exact version and checksum-verified: the binary is fetched
+      # at runtime, so an unpinned tag would be an unreviewed remote dependency.
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          curl -sSLo gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar xzf gitleaks.tar.gz gitleaks
+          # `gitleaks git` exits 0 with "no leaks found" when it has no history
+          # to read — a shallow clone scans 1 commit and passes vacuously, and a
+          # non-repo scans 0. Fail loudly instead of reporting a clean scan.
+          test "$(git rev-parse --is-inside-work-tree 2>/dev/null)" = "true" \
+            || { echo "::error::not a git checkout — gitleaks would pass vacuously"; exit 1; }
+          test "$(git rev-parse --is-shallow-repository)" = "false" \
+            || { echo "::error::shallow clone — gitleaks would miss history (need fetch-depth: 0)"; exit 1; }
+          ./gitleaks git --config .gitleaks.toml --redact --no-banner .
