@@ -3,6 +3,11 @@
 # Install: pip install pre-commit && pre-commit install
 # Run manually: pre-commit run --all-files
 
+# Paths no hook should touch. CyberGym task artifacts are generated benchmark
+# fixtures (PoC blobs, run logs) — whitespace/EOF fixing corrupts byte-exact
+# reproducers, and linting generated output is meaningless.
+exclude: ^examples/cybergym/task_artifacts/
+
 repos:
   - repo: local
     hooks:
