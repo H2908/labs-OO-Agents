@@ -77,6 +77,18 @@ members = [
 
 
 [project.optional-dependencies]
+# Convenience aliases for the sibling distributions, so `pip install
+# nooa[cli]` does what a user reasonably expects. Without these, that command
+# *succeeds* with only a warning and silently installs no CLI.
+#
+# These are deliberately circular (nooa[cli] -> nooa-cli -> nooa); pip and uv
+# both resolve that fine, and it is the standard pattern for a split
+# core/plugin distribution. No version floor, matching the existing policy in
+# packages/*/pyproject.toml: published wheels declare what they actually need
+# rather than being locked to their co-released version.
+cli = ["nooa-cli"]
+memory = ["nooa-memory"]
+bench = ["nooa-bench"]
 # ARC-AGI-3 example agent (examples/arc_agi_3): the public ARC-AGI-3 SDK + deps.
 # Install with `pip install "nemo-oo-agents[arc]"` (or `uv sync --extra arc`).
 arc = [
