@@ -17,6 +17,7 @@ import re
 import types
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -767,6 +768,7 @@ class MCPManager:
         oauth_timeout: float | None = None,
         mcp_file: Path | None = None,
         servers: dict[str, dict[str, Any]] | None = None,
+        tool_call_timeout: timedelta = timedelta(seconds=60),
     ) -> MCPTool:
         """Create a per-server tool instance; connects to the MCP server.
 
@@ -789,6 +791,8 @@ class MCPManager:
             oauth_browser_open: Async hook to open the auth URL in a reachable browser (host handoff).
             mcp_file: Path to .mcp.json file (default: .mcp.json in cwd)
             servers: Optional inline server config from the TUI config.toml.
+            tool_call_timeout: How long one tool call may take before it fails.
+                Raise it for servers whose tools wrap slow work such as an LLM call.
 
         Returns:
             An MCPTool instance (dynamically generated class with methods for each tool).
@@ -845,6 +849,7 @@ class MCPManager:
             args=args,
             env=env,
             headers=headers,
+            tool_call_timeout=tool_call_timeout,
         )
 
         # Connect and list tools (with OAuth retry if needed)
@@ -890,6 +895,7 @@ class MCPManager:
                         args=args,
                         env=env,
                         headers=headers,
+                        tool_call_timeout=tool_call_timeout,
                     )
 
                     async def _connect_and_list_retry():

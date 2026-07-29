@@ -17,6 +17,10 @@ from mcp import (
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import streamable_http_client
 
+# Establishing the connection is not a tool call, so it keeps its own short budget.
+# Matches the connect timeout the MCP SDK's own SSE transport defaults to.
+CONNECT_TIMEOUT_SECONDS = 5.0
+
 
 class MCPBaseClient(ABC):
     """Base client for creating an MCP transport session and connecting to an MCP server.
@@ -120,7 +124,7 @@ class MCPSSEClient(MCPBaseClient):
                 url=self._url,
                 headers=self._headers if self._headers else None,
             ) as (read, write),
-            ClientSession(read, write) as session,
+            ClientSession(read, write, read_timeout_seconds=self._tool_call_timeout) as session,
         ):
             await session.initialize()
             yield session
@@ -197,7 +201,7 @@ class MCPStdioClient(MCPBaseClient):
         )
         async with (
             stdio_client(server_params) as (read, write),
-            ClientSession(read, write) as session,
+            ClientSession(read, write, read_timeout_seconds=self._tool_call_timeout) as session,
         ):
             await session.initialize()
             yield session
@@ -273,9 +277,19 @@ class MCPStreamableHTTPClient(MCPBaseClient):
             httpx.HTTPStatusError: If server returns HTTP error (e.g., 401 Unauthorized, 500)
             RuntimeError: If session initialization fails (MCP protocol error)
         """
-        # Create httpx client with custom headers
-        # streamable_http_client expects a pre-configured httpx.AsyncClient for headers
-        http_client = httpx.AsyncClient(headers=self._headers if self._headers else None)
+        # Create httpx client with custom headers.
+        # streamable_http_client expects a pre-configured httpx.AsyncClient, so this
+        # client's timeouts are the only ones that apply: the transport has no timeout
+        # arguments of its own to fall back on. Reading the response has to be allowed
+        # to take as long as a tool call may take, or a slow tool's reply arrives on a
+        # stream httpx already abandoned and the caller waits forever.
+        http_client = httpx.AsyncClient(
+            headers=self._headers if self._headers else None,
+            timeout=httpx.Timeout(
+                self._tool_call_timeout.total_seconds(),
+                connect=CONNECT_TIMEOUT_SECONDS,
+            ),
+        )
 
         try:
             async with (
@@ -288,7 +302,9 @@ class MCPStreamableHTTPClient(MCPBaseClient):
             ):
                 # Store the session ID callback for later retrieval
                 self._get_mcp_session_id = get_session_id
-                async with ClientSession(read, write) as session:
+                async with ClientSession(
+                    read, write, read_timeout_seconds=self._tool_call_timeout
+                ) as session:
                     await session.initialize()
                     yield session
         finally:
@@ -303,6 +319,7 @@ def create_mcp_client(
     args: list[str] | None = None,
     env: dict[str, str] | None = None,
     headers: dict[str, str] | None = None,
+    tool_call_timeout: timedelta = timedelta(seconds=60),
 ) -> MCPBaseClient:
     """Create an MCP client based on the transport type and configuration.
 
@@ -313,6 +330,7 @@ def create_mcp_client(
         args: Command arguments (optional, for stdio transport)
         env: Environment variables for the server process (optional, for stdio transport)
         headers: Optional custom HTTP headers to include in requests (for HTTP transports)
+        tool_call_timeout: How long one tool call may take before it fails
 
     Returns:
         An MCPBaseClient instance configured for the specified transport
@@ -328,15 +346,19 @@ def create_mcp_client(
         case "stdio":
             if command is None:
                 raise ValueError("command must be provided for stdio transport")
-            return MCPStdioClient(command=command, args=args, env=env)
+            return MCPStdioClient(
+                command=command, args=args, env=env, tool_call_timeout=tool_call_timeout
+            )
         case "sse":
             if url is None:
                 raise ValueError("url must be provided for sse transport")
-            return MCPSSEClient(url=url, headers=headers)
+            return MCPSSEClient(url=url, headers=headers, tool_call_timeout=tool_call_timeout)
         case "streamable-http":
             if url is None:
                 raise ValueError("url must be provided for streamable-http transport")
-            return MCPStreamableHTTPClient(url=url, headers=headers)
+            return MCPStreamableHTTPClient(
+                url=url, headers=headers, tool_call_timeout=tool_call_timeout
+            )
         case _:
             raise ValueError(
                 f"Unsupported transport type: {transport}. Use 'stdio', 'sse', or 'streamable-http'"
