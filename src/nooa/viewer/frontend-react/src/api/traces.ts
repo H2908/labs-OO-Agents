@@ -102,12 +102,24 @@ function nsDuration(startStr: string | undefined, endStr: string | undefined): n
   }
 }
 
+const VIEWER_PLUGIN_ATTR = 'nooa.viewer.plugin';
+const LEGACY_VIEWER_PLUGIN_ATTR = 'nemo_oo_agents.viewer.plugin';
+
+function getViewerPlugin(attrs: Record<string, unknown>): string | undefined {
+  const canonicalPlugin = attrs[VIEWER_PLUGIN_ATTR];
+  if (typeof canonicalPlugin === 'string') return canonicalPlugin;
+
+  // Keep imported traces from the pre-NOOA rename readable.
+  const legacyPlugin = attrs[LEGACY_VIEWER_PLUGIN_ATTR];
+  return typeof legacyPlugin === 'string' ? legacyPlugin : undefined;
+}
+
 /**
  * Derive the viewer plugin type, using span.name for more specific grouping
  * when the plugin is a generic category (e.g. "method" -> "method.handle").
  */
 function derivePluginType(attrs: Record<string, unknown>, spanName: string | undefined): string {
-  const plugin = attrs['nemo_oo_agents.viewer.plugin'] as string | undefined;
+  const plugin = getViewerPlugin(attrs);
   if (!plugin) return spanName || 'unknown';
 
   // For method/method_call plugins, the span name (e.g. "method.handle")
