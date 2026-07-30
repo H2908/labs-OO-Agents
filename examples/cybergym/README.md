@@ -19,11 +19,13 @@ evaluated it.
 - Linux host with Docker
 - Python 3.12 or 3.13
 - Git LFS (`git lfs version` should work)
-- LLM credentials for the model in [`nooa_cybergym/llm_config.yaml`](nooa_cybergym/llm_config.yaml)
+- LLM credentials (put in `.env`) for the model configured in [`nooa_cybergym/llm_config.yaml`](nooa_cybergym/llm_config.yaml)
 
-Put your credentials in a `.env` file in this directory. The keys you need depend
-on the model configured in `llm_config.yaml`. The default model (`openai/gpt-5.5`)
-uses the public OpenAI API:
+Put your credentials in a `.env` file in this directory. `llm_config.yaml` only
+names the env var that holds the key (`api_key_env`); the key itself lives in
+`.env`. Which keys you need depends on the model configured there. The default
+model (`openai/gpt-5.5`) uses the public OpenAI API, whose `api_key_env` is
+`OPENAI_API_KEY`:
 
 ```bash
 OPENAI_API_KEY=...
