@@ -1,40 +1,26 @@
 #!/usr/bin/env bash
+#
+# Run the CyberGym 10-task subset (or the task IDs you pass as arguments).
+# Requires the CyberGym server (scripts/start_server.sh) to be running.
+#
 set -euo pipefail
-
-AGENT_REPO="${AGENT_REPO:-$(pwd)}"
+source "$(dirname "$0")/config.sh"
+activate_venv
 cd "$AGENT_REPO"
 
 export PYTHONUNBUFFERED=1
 
-MODEL="${MODEL:-openai/gpt-5.5}"
-CYBERGYM_SERVER="${CYBERGYM_SERVER:-http://127.0.0.1:8666}"
-CYBERGYM_DATA_DIR="${CYBERGYM_DATA_DIR:-${CYBERGYM_REPO:-$AGENT_REPO/../cybergym}/cybergym_data/data}"
-CYBERGYM_MASK_MAP="${CYBERGYM_MASK_MAP:-${CYBERGYM_REPO:-$AGENT_REPO/../cybergym}/mask_map.json}"
 RUN_ROOT="${RUN_ROOT:-$AGENT_REPO/runs/validation_10task_$(date +%Y%m%d_%H%M%S)}"
 LOG_DIR="${LOG_DIR:-$RUN_ROOT/logs}"
 TMP_DIR="${TMP_DIR:-$RUN_ROOT/tmp}"
-TIMEOUT="${TIMEOUT:-3600}"
+# TIMEOUT comes from config.sh (default 4h). DIFFICULTY stays run-local.
 DIFFICULTY="${DIFFICULTY:-level1}"
 CLEAN_TASK_IMAGES="${CLEAN_TASK_IMAGES:-0}"
-RUNNER_IMAGE="${RUNNER_IMAGE:-nooa/nooa-cybergym:latest}"
-
-DEFAULT_TASKS=(
-  arvo:47101
-  arvo:3938
-  arvo:24993
-  arvo:1065
-  arvo:10400
-  arvo:368
-  oss-fuzz:42535201
-  oss-fuzz:42535468
-  oss-fuzz:370689421
-  oss-fuzz:385167047
-)
 
 if [ "$#" -gt 0 ]; then
   TASKS=("$@")
 else
-  TASKS=("${DEFAULT_TASKS[@]}")
+  TASKS=("${SUBSET_TASKS[@]}")
 fi
 
 mkdir -p "$LOG_DIR" "$TMP_DIR"
@@ -83,13 +69,7 @@ CyberGym server is not reachable at $CYBERGYM_SERVER.
 
 Start it in another terminal before running this script:
 
-  cd ${CYBERGYM_REPO:-$AGENT_REPO/../cybergym}
-  python3 -m cybergym.server \
-    --host 0.0.0.0 \
-    --port 8666 \
-    --mask_map_path "$CYBERGYM_MASK_MAP" \
-    --log_dir "$AGENT_REPO/runs/server" \
-    --db_path "$AGENT_REPO/runs/server/poc.db"
+  scripts/start_server.sh
 
 Then rerun this script. If your server is on another port, set CYBERGYM_SERVER.
 EOF
