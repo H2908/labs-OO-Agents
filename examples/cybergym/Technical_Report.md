@@ -6,7 +6,7 @@
 
 This submission evaluates an agent built on [**NVIDIA-labs Object-Oriented Agents (NOOA)**](https://github.com/NVIDIA-NeMo/labs-OO-Agents) on the **CyberGym Level 1** benchmark ([cybergym.io](https://www.cybergym.io/cybergym/)), where the agent gets a vulnerability description plus the pre-patch codebase and must produce a proof-of-concept input that crashes the pre-patch binary but not the patched one.
 
-Our CyberGym agent runs as a CodeAct agent with a shell and a todo manager, surveying the mounted source to locate the vulnerable function and author a minimal PoC. No cybersecurity domain knowledge or benchmark-specific hints are supplied.
+Our CyberGym agent runs as a CodeAct agent with a shell and a todo manager, surveying the mounted source to locate the vulnerable function and author a minimal PoC. No cybersecurity domain knowledge or benchmark-specific hints are supplied beyond what the base model already brings from pretraining.
 
 The underlying model is **OpenAI GPT-5.5** with reasoning effort set to `xhigh`.
 
@@ -27,9 +27,9 @@ The design unifies six model-facing ideas: typed input/output, pass by reference
 
 The NOOA CyberGym agent runs inside each trial container as a CodeAct agent that has full access to a Python runtime and is equipped with two additional tools: a shell (file search, source inspection, and command execution over the mounted codebase) and a todo manager for tracking multi-step work. On each task it reads the vulnerability description, surveys the mounted pre-patch source and build setup, identifies the vulnerable function and the input shape that reaches it, and authors a minimal, deterministic proof-of-concept, which it submits through the CyberGym submission interface.
 
-A deterministic scoring layer wraps the agent and keeps the scoring logic out of the agent's context. A submission method sends the authored PoC, replays it against the sanitizer-instrumented vulnerable binary, and returns a typed outcome (crash, ambiguous crash, no crash, or timeout) rather than raw tool output. Before a submission is accepted, a lightweight single-turn judge confirms that the model's summary still targets the specific vulnerability class described in the task; a mismatch is fed back as structured feedback and the agent retries. Accepted PoCs are re-submitted three times and are only kept if they crash in at least two of the three replays, rejecting non-deterministic crashes that would not survive server-side differential verification. A soft timeout well inside the harness limit returns the best crashing PoC found so far if the loop has not already converged.
+A deterministic scoring layer wraps the agent and keeps the scoring logic out of the agent's context. A submission method sends the authored PoC, replays it against the sanitizer-instrumented vulnerable binary, and returns a typed outcome (crash, ambiguous crash, no crash, or timeout) rather than raw tool output. Before a submission is accepted, a lightweight single-turn judge confirms that the model's summary still targets the specific vulnerability class described in the task. On a mismatch, structured feedback is returned to the agent and it retries. Accepted PoCs are re-submitted three times and are only kept if they crash in at least two of the three replays, rejecting non-deterministic crashes that would not survive server-side differential verification. A soft timeout well inside the harness limit returns the best crashing PoC found so far if the loop has not already converged.
 
-No cybersecurity domain knowledge, exploit templates, or benchmark-specific hints are supplied to the agent; the workflow above is generic vulnerability validation. Performance is therefore attributable to the agent architecture rather than to task-specific steering.
+No cybersecurity domain knowledge, exploit templates, or benchmark-specific hints are supplied to the agent beyond what the base model already brings from pretraining; the workflow above is generic vulnerability validation. Performance is therefore attributable to the agent architecture and the underlying model rather than to task-specific steering.
 
 * Code: [NOOA CyberGym](nooa_cybergym/main.py)
 
@@ -46,11 +46,10 @@ In the primary *Level 1* setting, agents receive a vulnerability description and
 ### 3.2 Agent Configuration
 
 * **Agent framework**: NVIDIA-labs Object-Oriented Agents (NOOA)
-* **Model**: OpenAI GPT-5.5 (`openai/azure/openai/gpt-5.5`)
+* **Model**: OpenAI GPT-5.5
 * **Reasoning effort**: `xhigh`
 * **Tools**: Python runtime with shell + todo manager
 * **Soft timeout**: 13,920 s (~3.87 h), returns best crashing PoC found so far
-<!-- TODO: Double check soft timeout -->
 
 ### 3.3 Access to Vulnerable vs. Patched Builds
 
