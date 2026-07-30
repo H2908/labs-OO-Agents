@@ -1,6 +1,6 @@
 # NOOA CyberGym
 
-**Contact:** TODO: Shall we add this?
+<!-- **Contact:** TODO -->
 
 ## 1. Overview
 
@@ -20,8 +20,8 @@ NVIDIA-labs Object-Oriented Agents (NOOA) is a model-agnostic, open-source Pytho
 
 The design unifies six model-facing ideas: typed input/output, pass by reference to live Python objects, code as action, programmable orchestration loops, explicit typed object state, and model-callable harness APIs.
 
-Code: [NVIDIA-labs Object-Oriented Agents (NOOA)](https://github.com/NVIDIA-NeMo/labs-OO-Agents).
-Paper: [NVIDIA-labs OO Agents: Native Python Object-Oriented Agents](https://arxiv.org/abs/2607.20709).
+* Code: [NVIDIA-labs Object-Oriented Agents (NOOA)](https://github.com/NVIDIA-NeMo/labs-OO-Agents).
+* Paper: [NVIDIA-labs OO Agents: Native Python Object-Oriented Agents](https://arxiv.org/abs/2607.20709).
 
 ### 2.2 NOOA CyberGym Agent
 
@@ -31,9 +31,7 @@ A deterministic scoring layer wraps the agent and keeps the scoring logic out of
 
 No cybersecurity domain knowledge, exploit templates, or benchmark-specific hints are supplied to the agent; the workflow above is generic vulnerability validation. Performance is therefore attributable to the agent architecture rather than to task-specific steering.
 
-<!-- TODO: Add GitHub link -->
-
-Code: [`nooa_cybergym`](nooa_cybergym/main.py)
+* Code: [NOOA CyberGym](nooa_cybergym/main.py)
 
 ## 3. Methodology
 
@@ -102,18 +100,18 @@ The token, cost, and timing figures below are per-trial averages over the valid 
 
 Top 9 published results on the CyberGym Level 1 leaderboard (one trial, sorted by success rate, as reported on [cybergym.io](https://www.cybergym.io/cybergym/), retrieved 2026-07-28).
 
-| #  | Submission                 | Model(s)                                    | Score     | Date       | Source                                                                                                                                                                        |
-|----|----------------------------|---------------------------------------------|-----------|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1  | Wiz Atlas                  | GPT-5.5, Claude Opus 4.6                    | 90.9%     | 2026-07-27 | [Wiz](https://www.wiz.io/blog/atlas-ai-vulnerability-researcher)                                                                                                              |
-| 2  | Crystalline                | Claude Opus 4.6                             | 89.6%     | 2026-06-08 | [Independent researcher](https://github.com/synchopate/cybergym-logos)                                                                                                        |
-| 3  | MDASH                      | GPT-5.4, Claude Opus 4.6, Claude Sonnet 4.6 | 88.4%     | 2026-05-12 | [Microsoft](https://www.microsoft.com/en-us/security/blog/2026/05/12/defense-at-ai-speed-microsofts-new-multi-model-agentic-security-system-tops-leading-industry-benchmark/) |
-| 4  | **NOOA CyberGym**          | **GPT-5.5**                                 | **86.8%** | 2026-07-28 | This work                                                                                                                                                                     |
-| 5  | Sangfor AI                 | GLM-5.2                                     | 86.3%     | 2026-07-21 | [Sangfor AI](https://github.com/Sangfor-AI/cybergym-submission-sangfor-ai)                                                                                                    |
-| 6  | GPT-5.5-Cyber              | GPT-5.5-Cyber (OpenAI Agent)                | 85.6%     | 2026-06-22 | [OpenAI](https://openai.com/index/daybreak-securing-the-world/)                                                                                                               |
-| 7  | Xuanwu Atuin AI            | GLM-5.2                                     | 84.8%     | 2026-07-22 | [Tencent Xuanwu Lab](https://xlab.tencent.com/en/2026/07/17/xuanwu-atuin-cybergym-glm52/)                                                                                     |
-| 8  | Claude Mythos Preview      | Claude Mythos Preview (Anthropic Agent)     | 83.1%     | 2026-04-07 | [Anthropic](https://www.anthropic.com/claude-mythos-preview-system-card)                                                                                                      |
-| 9  | GPT-5.5                    | GPT-5.5 (OpenAI Agent)                      | 81.8%     | 2026-04-23 | [OpenAI](https://openai.com/index/introducing-gpt-5-5)                                                                                                                        |
-| 10 | GPT-5.4                    | GPT-5.4 (OpenAI Agent)                      | 79.0%     | 2026-04-23 | [OpenAI](https://openai.com/index/introducing-gpt-5-5)                                                                                                                        |
+| #  | Submission                 | Model(s)                                    | Score     | Date           | Source                                                                                                                                                                        |
+|----|----------------------------|---------------------------------------------|-----------|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1  | Wiz Atlas                  | GPT-5.5, Claude Opus 4.6                    | 90.9%     | 2026-07-27     | [Wiz](https://www.wiz.io/blog/atlas-ai-vulnerability-researcher)                                                                                                              |
+| 2  | Crystalline                | Claude Opus 4.6                             | 89.6%     | 2026-06-08     | [Independent researcher](https://github.com/synchopate/cybergym-logos)                                                                                                        |
+| 3  | MDASH                      | GPT-5.4, Claude Opus 4.6, Claude Sonnet 4.6 | 88.4%     | 2026-05-12     | [Microsoft](https://www.microsoft.com/en-us/security/blog/2026/05/12/defense-at-ai-speed-microsofts-new-multi-model-agentic-security-system-tops-leading-industry-benchmark/) |
+| 4  | **NOOA CyberGym**          | **GPT-5.5**                                 | **86.8%** | **2026-07-28** | **This work**                                                                                                                                                                 |
+| 5  | Sangfor AI                 | GLM-5.2                                     | 86.3%     | 2026-07-21     | [Sangfor AI](https://github.com/Sangfor-AI/cybergym-submission-sangfor-ai)                                                                                                    |
+| 6  | GPT-5.5-Cyber              | GPT-5.5-Cyber (OpenAI Agent)                | 85.6%     | 2026-06-22     | [OpenAI](https://openai.com/index/daybreak-securing-the-world/)                                                                                                               |
+| 7  | Xuanwu Atuin AI            | GLM-5.2                                     | 84.8%     | 2026-07-22     | [Tencent Xuanwu Lab](https://xlab.tencent.com/en/2026/07/17/xuanwu-atuin-cybergym-glm52/)                                                                                     |
+| 8  | Claude Mythos Preview      | Claude Mythos Preview (Anthropic Agent)     | 83.1%     | 2026-04-07     | [Anthropic](https://www.anthropic.com/claude-mythos-preview-system-card)                                                                                                      |
+| 9  | GPT-5.5                    | GPT-5.5 (OpenAI Agent)                      | 81.8%     | 2026-04-23     | [OpenAI](https://openai.com/index/introducing-gpt-5-5)                                                                                                                        |
+| 10 | GPT-5.4                    | GPT-5.4 (OpenAI Agent)                      | 79.0%     | 2026-04-23     | [OpenAI](https://openai.com/index/introducing-gpt-5-5)                                                                                                                        |
 
 ## 5. Artifacts
 
