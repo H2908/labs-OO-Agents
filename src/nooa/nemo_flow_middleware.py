@@ -38,9 +38,11 @@ Requirements:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 from nooa.runtime.middleware import (
@@ -73,6 +75,22 @@ except ImportError:
     _HAS_NEMO_FLOW = False
     nemo_flow = None  # type: ignore[assignment]
     LLMRequest = None  # type: ignore[assignment,misc]
+
+# The ContextVar holding NeMo Relay's mutable ScopeStack. It is private
+# upstream (not in ``nemo_relay.__all__``), so resolve it defensively: if a
+# future release renames it we degrade to the old shared-stack behaviour —
+# correct for sequential nesting, broken only for overlapping calls, which is
+# exactly where we are today. ``tests/test_nemo_flow_middleware.py`` asserts
+# the attribute still exists so an upstream rename fails in CI rather than
+# silently reverting. See nemo_flow_agent_call_middleware for why it matters.
+_SCOPE_STACK_VAR = getattr(nemo_flow, "_scope_stack_var", None) if _HAS_NEMO_FLOW else None
+
+# Current NeMo Relay scope as ``(handle, owning asyncio task)``. Unlike the
+# upstream ScopeStack this holds an *immutable* handle, so a child task that
+# sets it cannot disturb its parent or its siblings.
+_current_relay_scope: ContextVar[tuple[Any, Any] | None] = ContextVar(
+    "_nooa_relay_scope", default=None
+)
 
 _INSTALL_MSG = (
     "nemo_flow is required for NeMo Flow integration. The package was renamed "
@@ -281,6 +299,15 @@ async def nemo_flow_tool_middleware(
     )
 
 
+def _ambient_handle() -> Any:
+    """Return the current top-of-stack scope handle, or ``None`` if unavailable."""
+    try:
+        return nemo_flow.scope.get_handle()  # type: ignore[union-attr]
+    except Exception:
+        _logger.debug("nemo_flow: scope.get_handle() failed", exc_info=True)
+        return None
+
+
 async def nemo_flow_agent_call_middleware(
     ctx: AgentCallContext,
     nxt: AgentCallNext,
@@ -290,18 +317,78 @@ async def nemo_flow_agent_call_middleware(
     Pushes a ``ScopeType.Function`` scope named ``"AgentClass.method_name"``
     before the method executes and pops it after, giving ATIF per-method
     granularity.
+
+    Concurrency
+    -----------
+    NeMo Relay keeps a single mutable LIFO scope stack in a ContextVar, and
+    child asyncio tasks inherit it *by reference*.  Two agent calls that
+    overlap in time (e.g. ``asyncio.gather(self.a(), self.b())`` in generated
+    code) therefore interleave their pushes on one stack, and whichever
+    finishes first cannot pop — ``pop()`` rejects any handle that is not on
+    top.  The stack is then permanently desynchronised: scopes never emit end
+    events, later scopes reparent under the leaked one, and the root pop
+    raises out of :func:`nemo_flow_scope`.
+
+    The fix is to give a concurrently-dispatched call its own scope stack, so
+    its pushes and pops can never interleave with a sibling's.  Parent linkage
+    survives isolation because ``scope.push(handle=...)`` accepts an explicit
+    parent handle from another stack.  A call that runs in the *same* task as
+    its parent keeps the shared stack — sequential nesting is already correct,
+    and staying on the shared stack preserves ``scope_local`` registrations
+    made on ancestor scopes.
+
+    Known limitation: a concurrently-dispatched call runs on its own stack, so
+    ``nemo_relay.scope_local`` registrations made on an *ancestor* scope do not
+    apply to it.  Global guardrails/intercepts/subscribers are unaffected, as
+    are scope-locals registered on the call's own scope.  Overlapping calls
+    previously corrupted the stack outright, so this is strictly an
+    improvement, but it is a real behavioural difference worth knowing.
     """
     assert nemo_flow is not None
 
+    prev = _current_relay_scope.get()
+    if prev is None:
+        # install_nemo_flow() used without nemo_flow_scope(): adopt whatever
+        # scope is currently active as the parent.
+        parent, owner_task = _ambient_handle(), None
+    else:
+        parent, owner_task = prev
+
+    task = asyncio.current_task()
+    stack_token = None
+    if owner_task is not task and _SCOPE_STACK_VAR is not None:
+        # Concurrent sibling — isolate its stack so pops stay in order.
+        stack_token = _SCOPE_STACK_VAR.set(nemo_flow.create_scope_stack())  # type: ignore[union-attr]
+
     scope_name = f"{type(ctx.agent).__name__}.{ctx.method_name}"
-    handle = nemo_flow.scope.push(scope_name, nemo_flow.ScopeType.Function)  # type: ignore[union-attr]
+    handle = nemo_flow.scope.push(  # type: ignore[union-attr]
+        scope_name, nemo_flow.ScopeType.Function, handle=parent
+    )
+    token = _current_relay_scope.set((handle, task))
     try:
         return await nxt(ctx)
     finally:
         try:
+            _current_relay_scope.reset(token)
+        except ValueError:
+            # Token created in a different Context (manual __aenter__/__aexit__
+            # across a task boundary). Fall back to restoring the value.
+            _current_relay_scope.set(prev)
+        try:
             nemo_flow.scope.pop(handle)  # type: ignore[union-attr]
         except Exception:
-            _logger.debug("nemo_flow_agent_call_middleware: scope.pop() failed", exc_info=True)
+            # With per-task isolation this is genuinely exceptional — it means
+            # the stack is out of sync, so log loudly rather than hiding it.
+            _logger.warning(
+                "nemo_flow_agent_call_middleware: scope.pop() failed for %r; "
+                "the NeMo Relay scope stack may be out of sync",
+                scope_name,
+                exc_info=True,
+            )
+        # Must happen AFTER the pop: restoring the stack var first makes the
+        # handle unreachable and the pop fails with "scope handle not found".
+        if stack_token is not None and _SCOPE_STACK_VAR is not None:
+            _SCOPE_STACK_VAR.reset(stack_token)
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +452,18 @@ async def nemo_flow_scope(
             scope_name,
             nemo_flow.ScopeType.Agent,  # type: ignore[union-attr]
         ) as handle:
-            yield handle
+            # Seed the root so agent calls parent off it explicitly rather than
+            # off whatever happens to be on top of the shared stack.  The pop
+            # of this scope is deliberately NOT guarded: with per-task stack
+            # isolation it can only fail if the stack is genuinely corrupt, and
+            # that must surface rather than leave every later trace misrooted.
+            token = _current_relay_scope.set((handle, asyncio.current_task()))
+            try:
+                yield handle
+            finally:
+                try:
+                    _current_relay_scope.reset(token)
+                except ValueError:
+                    _current_relay_scope.set(None)
     finally:
         uninstall()

@@ -139,9 +139,9 @@ class TestLLMRequestIntercepts:
 
         def _intercept(
             name: str, req: nemo_flow.LLMRequest, annotated: nemo_flow.AnnotatedLLMRequest | None
-        ) -> tuple[nemo_flow.LLMRequest, nemo_flow.AnnotatedLLMRequest | None]:
+        ) -> nemo_flow.LLMRequestInterceptOutcome:
             req.headers["X-Test-Header"] = "test-value"
-            return req, annotated
+            return nemo_flow.LLMRequestInterceptOutcome(req, annotated)
 
         nemo_flow.intercepts.register_llm_request("test-header", 1, False, _intercept)
         try:
@@ -188,14 +188,16 @@ class TestLLMRequestIntercepts:
 
         def _intercept(
             name: str, req: nemo_flow.LLMRequest, annotated: nemo_flow.AnnotatedLLMRequest | None
-        ) -> tuple[nemo_flow.LLMRequest, nemo_flow.AnnotatedLLMRequest | None]:
+        ) -> nemo_flow.LLMRequestInterceptOutcome:
             # Must return a new LLMRequest — NeMo Flow serializes through Rust/JSON,
             # so in-place mutations on the original object are lost.
             new_content = dict(req.content)
             msgs = list(new_content.get("messages", []))
             msgs.insert(0, {"role": "system", "content": "INJECTED BY INTERCEPT"})
             new_content["messages"] = msgs
-            return nemo_flow.LLMRequest(req.headers, new_content), annotated
+            return nemo_flow.LLMRequestInterceptOutcome(
+                nemo_flow.LLMRequest(req.headers, new_content), annotated
+            )
 
         nemo_flow.intercepts.register_llm_request("test-inject", 1, False, _intercept)
         try:
@@ -1053,10 +1055,12 @@ class TestLLMRequestInterceptParamPropagation:
 
         def _intercept(
             name: str, req: nemo_flow.LLMRequest, annotated: nemo_flow.AnnotatedLLMRequest | None
-        ) -> tuple[nemo_flow.LLMRequest, nemo_flow.AnnotatedLLMRequest | None]:
+        ) -> nemo_flow.LLMRequestInterceptOutcome:
             new_content = dict(req.content)
             new_content["temperature"] = 0.0
-            return nemo_flow.LLMRequest(req.headers, new_content), annotated
+            return nemo_flow.LLMRequestInterceptOutcome(
+                nemo_flow.LLMRequest(req.headers, new_content), annotated
+            )
 
         nemo_flow.intercepts.register_llm_request("test-temp", 1, False, _intercept)
         try:
@@ -1082,10 +1086,12 @@ class TestLLMRequestInterceptParamPropagation:
 
         def _intercept(
             name: str, req: nemo_flow.LLMRequest, annotated: nemo_flow.AnnotatedLLMRequest | None
-        ) -> tuple[nemo_flow.LLMRequest, nemo_flow.AnnotatedLLMRequest | None]:
+        ) -> nemo_flow.LLMRequestInterceptOutcome:
             new_content = dict(req.content)
             new_content["max_tokens"] = 100
-            return nemo_flow.LLMRequest(req.headers, new_content), annotated
+            return nemo_flow.LLMRequestInterceptOutcome(
+                nemo_flow.LLMRequest(req.headers, new_content), annotated
+            )
 
         nemo_flow.intercepts.register_llm_request("test-maxtok", 1, False, _intercept)
         try:
@@ -1137,3 +1143,122 @@ class TestToolRequestInterceptParamPropagation:
             assert nxt_saw_params[0]["timeout"] == 5
         finally:
             nemo_flow.intercepts.deregister_tool_request("test-timeout")
+
+
+# ===================================================================
+# Regression: overlapping agent calls must not corrupt the scope stack
+# ===================================================================
+
+
+class TestConcurrentAgentCallScopes:
+    """NeMo Relay keeps one mutable LIFO scope stack per context, inherited by
+    child asyncio tasks *by reference*.  Agent calls that overlap in time (e.g.
+    ``asyncio.gather(self.a(), self.b())`` in generated code) used to interleave
+    their pushes on that shared stack; whichever finished first could not pop,
+    leaving the stack permanently desynchronised and raising out of
+    ``nemo_flow_scope``.  ``nemo_flow_agent_call_middleware`` now isolates a
+    concurrently-dispatched call onto its own stack.
+    """
+
+    def test_scope_stack_var_still_exists_upstream(self):
+        """The private ContextVar the fix relies on must still be there.
+
+        It is not part of ``nemo_relay.__all__``; if upstream renames it the
+        middleware silently degrades to the old (broken) shared-stack path, so
+        fail loudly here instead.
+        """
+        import nooa.nemo_flow_middleware as nm
+
+        assert getattr(nemo_flow, "_scope_stack_var", None) is not None, (
+            "nemo_relay._scope_stack_var is gone — nemo_flow_agent_call_middleware "
+            "can no longer isolate concurrent scopes; see its Concurrency docstring."
+        )
+        assert nm._SCOPE_STACK_VAR is not None
+
+    @pytest.mark.asyncio
+    async def test_overlapping_agent_calls_keep_stack_balanced(self):
+        """Siblings that finish out of order still pop cleanly."""
+        import asyncio
+
+        async def one(method_name: str, delay: float):
+            ctx = AgentCallContext(agent=None, method_name=method_name)
+
+            async def body(c):
+                await asyncio.sleep(delay)
+                c.result = method_name
+                return c
+
+            await nemo_flow_agent_call_middleware(ctx, body)
+
+        with nemo_flow.scope.scope("concurrent-root", nemo_flow.ScopeType.Agent) as root:
+            import nooa.nemo_flow_middleware as nm
+
+            token = nm._current_relay_scope.set((root, asyncio.current_task()))
+            try:
+                # "first" finishes before "second", so a shared stack would pop
+                # out of order and raise.
+                await asyncio.gather(one("first", 0.01), one("second", 0.05))
+                # The root must still be on top; otherwise the surrounding
+                # scope.scope() would raise on exit.
+                assert nemo_flow.scope.get_handle().uuid == root.uuid
+            finally:
+                nm._current_relay_scope.reset(token)
+
+    @pytest.mark.asyncio
+    async def test_overlapping_siblings_share_the_same_parent(self):
+        """Isolation must not detach siblings into separate roots."""
+        import asyncio
+
+        handles: list = []
+
+        async def one(method_name: str, delay: float):
+            ctx = AgentCallContext(agent=None, method_name=method_name)
+
+            async def body(c):
+                import nooa.nemo_flow_middleware as nm
+
+                handles.append(nm._current_relay_scope.get()[0])
+                await asyncio.sleep(delay)
+                c.result = method_name
+                return c
+
+            await nemo_flow_agent_call_middleware(ctx, body)
+
+        with nemo_flow.scope.scope("parent-root", nemo_flow.ScopeType.Agent) as root:
+            import nooa.nemo_flow_middleware as nm
+
+            token = nm._current_relay_scope.set((root, asyncio.current_task()))
+            try:
+                await asyncio.gather(one("left", 0.01), one("right", 0.03))
+            finally:
+                nm._current_relay_scope.reset(token)
+
+        assert len(handles) == 2
+        # Both siblings parent off the shared root, not off each other.
+        assert {str(h.parent_uuid) for h in handles} == {str(root.uuid)}
+        assert handles[0].uuid != handles[1].uuid
+
+    @pytest.mark.asyncio
+    async def test_sequential_nesting_still_unwinds(self):
+        """The isolation path must not regress ordinary nested calls."""
+        seen: list[str] = []
+
+        async def inner(c):
+            seen.append(nemo_flow.scope.get_handle().name)
+            c.result = "inner"
+            return c
+
+        async def outer(c):
+            seen.append(nemo_flow.scope.get_handle().name)
+            inner_ctx = AgentCallContext(agent=None, method_name="inner")
+            await nemo_flow_agent_call_middleware(inner_ctx, inner)
+            # After the nested call returns, the scope must unwind back.
+            seen.append(nemo_flow.scope.get_handle().name)
+            c.result = "outer"
+            return c
+
+        with nemo_flow.scope.scope("seq-root", nemo_flow.ScopeType.Agent):
+            ctx = AgentCallContext(agent=None, method_name="outer")
+            await nemo_flow_agent_call_middleware(ctx, outer)
+
+        assert seen == ["NoneType.outer", "NoneType.inner", "NoneType.outer"]

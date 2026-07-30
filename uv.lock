@@ -10,7 +10,7 @@ supported-markers = [
 ]
 
 [options]
-exclude-newer = "2026-07-03T00:00:00Z"
+exclude-newer = "2026-07-23T00:00:00Z"
 
 [manifest]
 members = [
@@ -1318,14 +1318,14 @@ wheels = [
 
 [[package]]
 name = "nemo-relay"
-version = "0.4.0"
+version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/f0/1626672dd86005570afbcd4e368f5f271bcd2104ceaee883e839b11bfc81/nemo_relay-0.4.0-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:d5f14fe5c8e5fbcc26827cc88e5b867f4ad37d6f983100cbf31705234c39f9d3", size = 6674344, upload-time = "2026-06-12T23:24:02.707Z" },
-    { url = "https://files.pythonhosted.org/packages/c1/35/956142c558334ec8594d97da6a1a717e70ba43685659dbdf18965c87c3f5/nemo_relay-0.4.0-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6a5a5f5dec1428085f6c41c3645f1773f9cfb154cfa47306c93d6514091a8006", size = 5989959, upload-time = "2026-06-12T23:24:04.496Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/56/e5172ec8486deb23dabf5c948be81b8172840efdfcda42b1da1a8d9ef969/nemo_relay-0.4.0-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0f92883b81540076e4b6c5e754eb7726225336634204ebd22ff730ccbcfb2723", size = 6332992, upload-time = "2026-06-12T23:24:06.288Z" },
-    { url = "https://files.pythonhosted.org/packages/e4/ea/f44b16ecfebc1de47e2d832e63d9cf56ad24952f09d6182d9fa9fa276b05/nemo_relay-0.4.0-cp311-abi3-win_amd64.whl", hash = "sha256:a5d02d9d0a2d19bf341bf9fd1faae01713bc2021a5b144ef79f91a07ec4c0bfb", size = 6332134, upload-time = "2026-06-12T23:24:08.017Z" },
-    { url = "https://files.pythonhosted.org/packages/3a/45/eeedc7b7b5d2dea6be24f6ccca529abf3f97568d8dccff35de6430187ebe/nemo_relay-0.4.0-cp311-abi3-win_arm64.whl", hash = "sha256:dc1effd4052d1d47a1cdc553415c878a73d1e01c81a7e9f9194b30a3c88d1947", size = 5964432, upload-time = "2026-06-12T23:24:09.789Z" },
+    { url = "https://files.pythonhosted.org/packages/25/65/d320016505457cc30971f575e8dadffb923b7cfc780ab8bb25a4ce9d305c/nemo_relay-0.6.0-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:ad5dae6febf6532d7b113abc2a404679c8feffc499df3034b93d9a078185d2bb", size = 9917779, upload-time = "2026-07-22T20:07:48.961Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/c0/f33250e71c4206da1b339072893f9a1e39295fe1aceb9a2fef4b8620a0f2/nemo_relay-0.6.0-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c0cd9570f64c6956fe3bfb82af1cdb3ee70cb50b51098cdb0de831c3f9b4e904", size = 8888375, upload-time = "2026-07-22T20:07:51.049Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/f4/d1dfaed022da0f6f14765a122867f976a69cc520fe1faaf99757f5719d1f/nemo_relay-0.6.0-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:849daa9e45158ac581e54506e0fcc7a24f557d1ed06dbdc074f5de7a00393cbc", size = 9336372, upload-time = "2026-07-22T20:07:53.224Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/b0/908d77f75b9054e1e403da78f7d9430249a45939070d4298abbb41a04b5b/nemo_relay-0.6.0-cp311-abi3-win_amd64.whl", hash = "sha256:bfbbedfd130fa95c9b8c04643c30910df850e0ed3500beeab82b00ca2d94e7ea", size = 9613425, upload-time = "2026-07-22T20:07:55.175Z" },
+    { url = "https://files.pythonhosted.org/packages/cd/71/c438b9d746303ff7f270d99f13b250bf947cdac3e52de2a83fd132cbca0b/nemo_relay-0.6.0-cp311-abi3-win_arm64.whl", hash = "sha256:82fe132943399d89e6ec34dc28df0be7bbe41b84f6698c545928b8816b6010f6", size = 9034810, upload-time = "2026-07-22T20:07:57.467Z" },
 ]
 
 [[package]]
@@ -1419,7 +1419,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "litellm", specifier = ">=1.84.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0.0" },
-    { name = "nemo-relay", marker = "extra == 'nemo-relay'", specifier = ">=0.4.0" },
+    { name = "nemo-relay", marker = "extra == 'nemo-relay'", specifier = ">=0.6,<0.7" },
     { name = "openinference-instrumentation", marker = "extra == 'tracing'", specifier = ">=0.1.42" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.30" },
     { name = "openinference-instrumentation-litellm", marker = "extra == 'tracing'", specifier = ">=0.1.28" },
