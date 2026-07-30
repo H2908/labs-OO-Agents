@@ -5,7 +5,11 @@ dynamic = ["version"]
 description = "Benchmark agent (BenchAgent) and Harbor runner for the NOOA framework — reproduces the tech report's SWE-bench and Terminal-Bench results"
 license = {text = "Apache-2.0"}
 readme = "README.md"
-requires-python = ">=3.12"
+# Matches nooa and nooa-cli (both >=3.12,<3.14), which this depends on.
+# Without the upper bound, installing on 3.14 fails with a confusing
+# "could not find a version that satisfies nooa" instead of a clean
+# "requires a different Python".
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "nooa",
     "nooa-cli",

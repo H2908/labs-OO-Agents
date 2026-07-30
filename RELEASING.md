@@ -72,8 +72,12 @@ reviewer there gives a second pair of eyes before the irreversible step.
 
 ### Dry run against TestPyPI
 
-Run the **Publish** workflow manually (Actions → Publish → Run workflow) with
-target `testpypi`. This exercises the identical build and smoke test.
+Run the **Publish** workflow manually (Actions → Publish → Run workflow). This
+exercises the identical build, version check, and smoke test.
+
+A manual run always targets TestPyPI — there is no index selector. Real PyPI is
+reachable only by publishing a GitHub Release, so a mis-click here cannot burn
+a version number on PyPI.
 
 ### Doing it by hand
 

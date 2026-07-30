@@ -17,13 +17,10 @@ name: Publish
 on:
   release:
     types: [published]
+  # Manual runs are ALWAYS a TestPyPI dry run. There is deliberately no input
+  # to select the index: real PyPI is reachable only by publishing a GitHub
+  # Release, so a mis-click here cannot burn a version number on PyPI.
   workflow_dispatch:
-    inputs:
-      target:
-        description: "Index to upload to"
-        type: choice
-        options: [testpypi, pypi]
-        default: testpypi
 
 permissions: {}
 
@@ -110,7 +107,7 @@ jobs:
   # but a distinct environment is also what gives per-package approval gates.)
   publish-testpypi:
     needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false  # a partial publish is recoverable; a cancelled one is messier
@@ -155,7 +152,8 @@ jobs:
 
   publish-pypi:
     needs: build
-    if: github.event_name == 'release' || inputs.target == 'pypi'
+    # Real PyPI is reachable ONLY from a published GitHub Release.
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -214,6 +212,13 @@ jobs:
         with:
           name: dist
           path: dist/
-      - env:
+      # The tag name goes through `env:`, not `${{ }}` inside the script.
+      # GitHub expands `${{ }}` textually *before* bash parses the line, so a
+      # tag containing `$(...)` or backticks would execute — double quotes do
+      # not help, because the substitution happens before quoting is applied.
+      # This job holds `contents: write`. Via env, bash sees the value as data.
+      - name: Attach artifacts to the release
+        env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --repo "$GITHUB_REPOSITORY"
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY"
