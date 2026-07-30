@@ -2,18 +2,21 @@
 
 <br />
 
+<!-- Absolute URLs, not repo-relative paths: this README is also the PyPI
+     long_description, and PyPI renders it standalone with no assets/
+     directory alongside it, so relative paths 404 there. -->
 <picture>
   <source
     media="(prefers-color-scheme: dark)"
-    srcset="assets/nvidia-labs-object-oriented-agents-dark.svg"
+    srcset="https://raw.githubusercontent.com/NVIDIA-NeMo/labs-OO-Agents/main/assets/nvidia-labs-object-oriented-agents-dark.svg"
   >
   <source
     media="(prefers-color-scheme: light)"
-    srcset="assets/nvidia-labs-object-oriented-agents-light.svg"
+    srcset="https://raw.githubusercontent.com/NVIDIA-NeMo/labs-OO-Agents/main/assets/nvidia-labs-object-oriented-agents-light.svg"
   >
   <img
     alt="NVIDIA-labs Object Oriented Agents"
-    src="assets/nvidia-labs-object-oriented-agents-light.svg"
+    src="https://raw.githubusercontent.com/NVIDIA-NeMo/labs-OO-Agents/main/assets/nvidia-labs-object-oriented-agents-light.svg"
     width="820"
   >
 </picture>
@@ -23,9 +26,9 @@
 [![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?logo=nvidia&logoColor=white)](https://www.nvidia.com/)
 [![Paper](https://img.shields.io/badge/paper-arXiv-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2607.20709)
 [![Blog](https://img.shields.io/badge/blog-NVIDIA-76B900?logo=nvidia&logoColor=white)](https://developer.nvidia.com/blog/six-agent-harness-capabilities-for-higher-model-performance/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/LICENSE)
 
-**[Quick Start](#quick-start)** &nbsp;·&nbsp; **[Examples](examples/README.md)** &nbsp;·&nbsp; **[Paper](https://arxiv.org/abs/2607.20709)** &nbsp;·&nbsp; **[Blog](https://developer.nvidia.com/blog/six-agent-harness-capabilities-for-higher-model-performance/)**
+**[Quick Start](#quick-start)** &nbsp;·&nbsp; **[Examples](https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/examples/README.md)** &nbsp;·&nbsp; **[Paper](https://arxiv.org/abs/2607.20709)** &nbsp;·&nbsp; **[Blog](https://developer.nvidia.com/blog/six-agent-harness-capabilities-for-higher-model-performance/)**
 
 <br />
 
@@ -65,31 +68,59 @@ This design supports familiar Python testing, tracing, refactoring, and version-
 
 ## Installation
 
-Install directly from GitHub with [uv](https://docs.astral.sh/uv/getting-started/installation/). Add the **core** framework to a new (or existing) Python project:
+NOOA is on PyPI. Add the **core** framework to a new (or existing) Python
+project with [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```bash
 uv init my-agent-project
 cd my-agent-project
 
-uv add "nooa @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main"
+uv add nooa
 ```
 
+Or with pip: `pip install nooa`.
+
 <details>
-<summary><b>Optional sub-packages</b> — CLI, memory, evaluation pipeline</summary>
+<summary><b>Optional sub-packages</b> — CLI, memory, benchmarks, evaluation pipeline</summary>
 
 <br />
 
-All of these live in the same repo and are addressed with `#subdirectory=…`.
+The CLI, memory, and benchmark packages are separate distributions. Install
+them by name, or pull them in as extras of the core package:
 
 ```bash
-# CLI (beta): the `nooa` command, trace viewer, eval runner
-uv add "nooa-cli @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=packages/nooa-cli"
+uv add nooa-cli                 # or: uv add "nooa[cli]"
+uv add nooa-memory              # or: uv add "nooa[memory]"
+uv add nooa-bench               # or: uv add "nooa[bench]"
 
-# Long-term memory subsystem (MemoryManager)
-uv add "nooa-memory @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=packages/nooa-memory"
+uv add "nooa[cli,memory]"       # several at once
+```
 
-# Evaluation pipeline for agent testing
+| Package | Extra | What it adds |
+|---|---|---|
+| `nooa-cli` | `nooa[cli]` | the `nooa` command, trace viewer, eval runner |
+| `nooa-memory` | `nooa[memory]` | long-term memory subsystem (`MemoryManager`) |
+| `nooa-bench` | `nooa[bench]` | `BenchAgent` and the Harbor benchmark runner |
+
+`eval_pipeline` is not published to PyPI — install it from the repo:
+
+```bash
 uv add "eval_pipeline @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main#subdirectory=util/eval_pipeline"
+```
+
+</details>
+
+<details>
+<summary><b>Installing from source</b> — track <code>main</code> or pin a tag</summary>
+
+<br />
+
+```bash
+# latest development state
+uv add "nooa @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@main"
+
+# pinned to a release tag
+uv add "nooa @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@v0.0.7"
 ```
 
 </details>
@@ -151,7 +182,7 @@ uv run python examples/quickstart/01_first_generation_method.py
 
 Rename `analyze_feedback` to `analyze_feedback_briefly` and the output changes — your method name, parameters, and docstring *are* the prompt.
 
-Ready for more? See [**examples/**](examples/README.md) for the full progressive tutorial — structured output, tools, strategies, tracing, context blocks, MCP, and more.
+Ready for more? See [**examples/**](https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/examples/README.md) for the full progressive tutorial — structured output, tools, strategies, tracing, context blocks, MCP, and more.
 
 ### 3. See what your agent is doing
 
@@ -165,10 +196,10 @@ If the viewer isn't running, tracing is silently disabled — no configuration n
 
 ## Learn more
 
-- **[examples/README.md](examples/README.md)** — the full progressive tutorial: structured output, tools via `self`, strategies, progressive disclosure with `doc()`, tracing, dynamic prompts, context blocks, summarization, skills, MCP, sandbox, and more.
+- **[examples/README.md](https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/examples/README.md)** — the full progressive tutorial: structured output, tools via `self`, strategies, progressive disclosure with `doc()`, tracing, dynamic prompts, context blocks, summarization, skills, MCP, sandbox, and more.
 - **[Paper](https://arxiv.org/abs/2607.20709)** — design principles, harness details, capability tests, and SWE-bench Verified / Terminal-Bench 2.0 results.
 - **[Blog post](https://developer.nvidia.com/blog/six-agent-harness-capabilities-for-higher-model-performance/)** — Six Agent Harness Capabilities for Higher Model Performance.
-- **[AGENTS.md](AGENTS.md)** — conventions used inside this repo (helpful when reading the source).
+- **[AGENTS.md](https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/AGENTS.md)** — conventions used inside this repo (helpful when reading the source).
 
 ## Contributing
 
@@ -196,7 +227,7 @@ uv run ruff check            # lint
 uv run pyright               # type check
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+See [CONTRIBUTING.md](https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/CONTRIBUTING.md) for the full workflow.
 
 ## Citation
 
@@ -215,4 +246,4 @@ If you use NVIDIA-labs OO Agents in your research, please cite:
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Apache 2.0. See [LICENSE](https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/LICENSE) and [THIRD_PARTY_NOTICES.md](https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/THIRD_PARTY_NOTICES.md).
