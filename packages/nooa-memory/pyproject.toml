@@ -2,8 +2,9 @@
 name = "nooa-memory"
 # Version is derived from git tags at build time by uv-dynamic-versioning.
 dynamic = ["version"]
-description = "Long-term memory system for nooa agents (ships with the ARC-AGI-3 example; not yet published)"
+description = "Long-term memory system for NOOA agents — persistent recall backed by vector search"
 license = {text = "Apache-2.0"}
+readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "nooa",
@@ -15,6 +16,11 @@ dependencies = [
 # vector_backends.py and deliberately NOT declared as an extra: `uv sync
 # --all-extras` in CI would otherwise install the heavy chromadb stack that
 # the numpy default backend makes unnecessary.
+
+[project.urls]
+Homepage = "https://github.com/NVIDIA-NeMo/labs-OO-Agents"
+Repository = "https://github.com/NVIDIA-NeMo/labs-OO-Agents"
+Issues = "https://github.com/NVIDIA-NeMo/labs-OO-Agents/issues"
 
 [project.entry-points."nooa.skills"]
 "nemo.memory" = "nooa_memory.memory_skill:MemorySkill"
@@ -38,4 +44,3 @@ fallback-version = "0.0.6"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nooa_memory"]
-
