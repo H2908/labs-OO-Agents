@@ -68,8 +68,7 @@ This design supports familiar Python testing, tracing, refactoring, and version-
 
 ## Installation
 
-NOOA is on PyPI. Add the **core** framework to a new (or existing) Python
-project with [uv](https://docs.astral.sh/uv/getting-started/installation/):
+Add the **core** framework to a new (or existing) Python project with [uv](https://docs.astral.sh/uv/getting-started/installation/):
 
 ```bash
 uv init my-agent-project
