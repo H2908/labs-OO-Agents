@@ -1127,7 +1127,7 @@ class TestDebugHandlerTraceback:
 
 
 # =============================================================================
-# nemo_flow_middleware.py
+# nemo_relay_middleware.py
 # =============================================================================
 
 
@@ -1141,7 +1141,7 @@ class TestNemoFlowMiddlewareLLMModelName:
     def test_llm_model_name_extracted_from_agent(self):
         """Lines 99-101: model_name comes from agent._llm.model."""
         try:
-            from nooa.nemo_flow_middleware import _extract_model_name
+            from nooa.nemo_relay_middleware import _extract_model_name
         except (ImportError, AttributeError):
             # If the helper isn't exposed, test via the agent attribute path
             agent = MagicMock()
@@ -2400,12 +2400,12 @@ class TestMethodWrapperNonGenerationDirect:
 
 
 # =============================================================================
-# nemo_flow_middleware.py
+# nemo_relay_middleware.py
 # =============================================================================
 
 
 class TestNemoFlowMiddlewareAgentLlmPath:
-    """nemo_flow_middleware lines 99-101 and 169 require nemo_flow available."""
+    """nemo_relay_middleware lines 99-101 and 169 require nemo_relay available."""
 
     def test_serialize_response_unknown_type_returns_empty_dict(self):
         """Line 169: resp with no known serialization methods → empty dict {}."""
@@ -2413,21 +2413,21 @@ class TestNemoFlowMiddlewareAgentLlmPath:
         import sys
         from unittest.mock import MagicMock, patch
 
-        # Create fake nemo_flow
-        fake_nemo_flow = MagicMock()
+        # Create fake nemo_relay
+        fake_nemo_relay = MagicMock()
         fake_llm_request = MagicMock()
 
-        import nooa.nemo_flow_middleware  # noqa: F401 (ensure loaded)
+        import nooa.nemo_relay_middleware  # noqa: F401 (ensure loaded)
 
         with patch.dict(
             sys.modules,
-            {"nemo_relay": fake_nemo_flow, "nemo_relay.LLMRequest": fake_llm_request},
+            {"nemo_relay": fake_nemo_relay, "nemo_relay.LLMRequest": fake_llm_request},
         ):
-            nm = sys.modules["nooa.nemo_flow_middleware"]
+            nm = sys.modules["nooa.nemo_relay_middleware"]
             importlib.reload(nm)
 
             # We need to extract and test the inner serialize_response logic
-            # The function is nested inside nemo_flow_llm_middleware
+            # The function is nested inside nemo_relay_llm_middleware
             # Test the logic directly by understanding what it does
 
             # An object with no model_dump, no assistant_message, no raw_response
@@ -2454,7 +2454,7 @@ class TestNemoFlowMiddlewareAgentLlmPath:
 
             assert result == {}
 
-        # Reload AFTER patch.dict exits to restore _HAS_NEMO_FLOW = False
+        # Reload AFTER patch.dict exits to restore _HAS_NEMO_RELAY = False
         importlib.reload(nm)
 
     def test_llm_model_extraction_from_agent(self):

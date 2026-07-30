@@ -13,7 +13,7 @@ Covers:
 - skill.py: _find_skill_md on non-directory
 - storage/snapshot.py: is_nosnapshot_value continue path
 - storage/sqlite.py: SessionAlreadyActiveError, close-on-connect-failure
-- nemo_flow_middleware.py: model name extraction, _wrapper fallback return
+- nemo_relay_middleware.py: model name extraction, _wrapper fallback return
 - tools/web_publisher.py: RichOutput, WebPublisher methods
 """
 
@@ -809,7 +809,7 @@ class TestSQLiteModuleLevelAssertions:
 
 
 # =============================================================================
-# nemo_flow_middleware.py — model name extraction and _wrapper fallback
+# nemo_relay_middleware.py — model name extraction and _wrapper fallback
 # =============================================================================
 
 
@@ -818,17 +818,17 @@ class TestNemoFlowMiddlewareModelExtraction:
 
     @pytest.mark.asyncio
     async def test_model_name_from_agent_llm(self):
-        """nemo_flow_llm_middleware extracts model_name from ctx.agent._llm.model."""
-        fake_nemo_flow, _ = _make_fake_nemo_flow_for_test()
+        """nemo_relay_llm_middleware extracts model_name from ctx.agent._llm.model."""
+        fake_nemo_relay, _ = _make_fake_nemo_relay_for_test()
 
-        # Ensure nooa.nemo_flow_middleware is imported
-        import nooa.nemo_flow_middleware as _nm_ensure  # noqa: F401
+        # Ensure nooa.nemo_relay_middleware is imported
+        import nooa.nemo_relay_middleware as _nm_ensure  # noqa: F401
 
         with patch.dict(
             sys.modules,
-            {"nemo_relay": fake_nemo_flow},
+            {"nemo_relay": fake_nemo_relay},
         ):
-            nm = sys.modules["nooa.nemo_flow_middleware"]
+            nm = sys.modules["nooa.nemo_relay_middleware"]
             importlib.reload(nm)
             try:
                 mock_agent = MagicMock()
@@ -846,10 +846,10 @@ class TestNemoFlowMiddlewareModelExtraction:
                     return c
 
                 # The middleware should extract model_name = "gpt-4-test"
-                # We verify it doesn't crash and nemo_flow.llm.execute is called
+                # We verify it doesn't crash and nemo_relay.llm.execute is called
                 # with the correct model_name
-                await nm.nemo_flow_llm_middleware(ctx, mock_nxt)
-                call_args = fake_nemo_flow.llm.execute.call_args
+                await nm.nemo_relay_llm_middleware(ctx, mock_nxt)
+                call_args = fake_nemo_relay.llm.execute.call_args
                 assert call_args[0][0] == "gpt-4-test"  # first positional arg is model_name
             finally:
                 importlib.reload(nm)
@@ -861,9 +861,9 @@ class TestNemoFlowWrapperFallbackReturn:
     @pytest.mark.asyncio
     async def test_wrapper_fallback_empty_dict(self):
         """When resp has no model_dump, raw_response, or assistant_message, return {}."""
-        fake_nemo_flow, _ = _make_fake_nemo_flow_for_test()
+        fake_nemo_relay, _ = _make_fake_nemo_relay_for_test()
 
-        import nooa.nemo_flow_middleware as _nm_ensure  # noqa: F401
+        import nooa.nemo_relay_middleware as _nm_ensure  # noqa: F401
 
         captured_wrapper_result = {}
 
@@ -874,10 +874,10 @@ class TestNemoFlowWrapperFallbackReturn:
             result = await wrapper(request)
             captured_wrapper_result["result"] = result
 
-        fake_nemo_flow.llm.execute = AsyncMock(side_effect=llm_execute_capturing)
+        fake_nemo_relay.llm.execute = AsyncMock(side_effect=llm_execute_capturing)
 
-        with patch.dict(sys.modules, {"nemo_relay": fake_nemo_flow}):
-            nm = sys.modules["nooa.nemo_flow_middleware"]
+        with patch.dict(sys.modules, {"nemo_relay": fake_nemo_relay}):
+            nm = sys.modules["nooa.nemo_relay_middleware"]
             importlib.reload(nm)
             try:
                 ctx = MagicMock()
@@ -893,14 +893,14 @@ class TestNemoFlowWrapperFallbackReturn:
                     c.response = plain_resp
                     return c
 
-                await nm.nemo_flow_llm_middleware(ctx, mock_nxt)
+                await nm.nemo_relay_llm_middleware(ctx, mock_nxt)
                 assert captured_wrapper_result["result"] == {}
             finally:
                 importlib.reload(nm)
 
 
-def _make_fake_nemo_flow_for_test():
-    """Build a fake nemo_flow module for testing."""
+def _make_fake_nemo_relay_for_test():
+    """Build a fake nemo_relay module for testing."""
     fake = MagicMock()
     fake_handle = MagicMock()
     fake_handle.uuid = "test-uuid"

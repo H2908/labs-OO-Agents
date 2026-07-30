@@ -3,7 +3,7 @@
 """Unit tests covering remaining gaps in nooa modules.
 
 Targets:
-- nemo_flow_middleware.py: async middleware handlers
+- nemo_relay_middleware.py: async middleware handlers
 - config/truncation_config.py: validators
 - runtime/async_safety.py: concurrent.futures safety
 - runtime/event_query.py: event filtering
@@ -22,20 +22,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ===========================================================================
-# Helpers shared across NeMo Flow tests
+# Helpers shared across NeMo Relay tests
 # ===========================================================================
 
 
-def _make_fake_nemo_flow():
-    """Build a MagicMock that looks like nemo_flow."""
+def _make_fake_nemo_relay():
+    """Build a MagicMock that looks like nemo_relay."""
     fake = MagicMock()
     fake_handle = MagicMock()
     fake_handle.uuid = "test-uuid-1234"
     fake.scope.scope.return_value.__enter__ = MagicMock(return_value=fake_handle)
     fake.scope.scope.return_value.__exit__ = MagicMock(return_value=False)
-    # llm.execute is called as: await nemo_flow.llm.execute(...)
+    # llm.execute is called as: await nemo_relay.llm.execute(...)
     fake.llm.execute = AsyncMock(side_effect=_invoke_wrapper_for_llm)
-    # tools.execute is called as: await nemo_flow.tools.execute(...)
+    # tools.execute is called as: await nemo_relay.tools.execute(...)
     fake.tools.execute = AsyncMock(side_effect=_invoke_wrapper_for_tools)
     # scope.push / scope.pop
     fake.scope.push.return_value = MagicMock(name="scope_handle")
@@ -45,7 +45,7 @@ def _make_fake_nemo_flow():
 
 # These callables are replaced per-test; the defaults just call through.
 async def _invoke_wrapper_for_llm(*args, **kwargs):
-    """Default: call the wrapper with the request to simulate NeMo Flow invoking it."""
+    """Default: call the wrapper with the request to simulate NeMo Relay invoking it."""
     # Signature: (model_name, request, wrapper, model_name=model_name)
     # positional args: (model_name, request, wrapper)
     wrapper = args[2]
@@ -54,50 +54,50 @@ async def _invoke_wrapper_for_llm(*args, **kwargs):
 
 
 async def _invoke_wrapper_for_tools(tool_name, args, wrapper):
-    """Default: call the wrapper with the args to simulate NeMo Flow invoking it."""
+    """Default: call the wrapper with the args to simulate NeMo Relay invoking it."""
     await wrapper(args)
 
 
 @contextmanager
-def _nemo_flow_patched():
-    """Patch sys.modules with a fake nemo_flow, reload nemo_flow_middleware, yield (module, fake)."""
+def _nemo_relay_patched():
+    """Patch sys.modules with a fake nemo_relay, reload nemo_relay_middleware, yield (module, fake)."""
 
-    fake_nemo_flow, fake_handle = _make_fake_nemo_flow()
+    fake_nemo_relay, fake_handle = _make_fake_nemo_relay()
 
     # LLMRequest needs to be constructable
     fake_llm_request_cls = MagicMock(return_value=MagicMock(content={}))
 
     # Ensure the module is imported before patching (KeyError if not in sys.modules)
-    import nooa.nemo_flow_middleware as _nm_ensure  # noqa: F811, F401
+    import nooa.nemo_relay_middleware as _nm_ensure  # noqa: F811, F401
 
     with patch.dict(
         sys.modules,
         {
-            "nemo_relay": fake_nemo_flow,
+            "nemo_relay": fake_nemo_relay,
             "nemo_relay.LLMRequest": fake_llm_request_cls,
         },
     ):
-        nm = sys.modules["nooa.nemo_flow_middleware"]
+        nm = sys.modules["nooa.nemo_relay_middleware"]
         importlib.reload(nm)
         try:
-            yield nm, fake_nemo_flow, fake_handle
+            yield nm, fake_nemo_relay, fake_handle
         finally:
-            pass  # Don't reload here — still inside patch.dict so nemo_flow is present
+            pass  # Don't reload here — still inside patch.dict so nemo_relay is present
 
-    # Reload AFTER patch.dict exits (nemo_flow removed from sys.modules)
+    # Reload AFTER patch.dict exits (nemo_relay removed from sys.modules)
     importlib.reload(nm)
 
 
 # ===========================================================================
-# nemo_flow_middleware.py — async handler tests
+# nemo_relay_middleware.py — async handler tests
 # ===========================================================================
 
 
 class TestNemoFlowLLMMiddleware:
-    """Tests for nemo_flow_llm_middleware (lines 92–184)."""
+    """Tests for nemo_relay_llm_middleware (lines 92–184)."""
 
-    async def _run_llm_middleware(self, fake_nemo_flow, nm, ctx_kwargs=None, nxt_response=None):
-        """Helper: build ctx/nxt and run nemo_flow_llm_middleware."""
+    async def _run_llm_middleware(self, fake_nemo_relay, nm, ctx_kwargs=None, nxt_response=None):
+        """Helper: build ctx/nxt and run nemo_relay_llm_middleware."""
         from nooa.runtime.middleware import LLMCallContext
 
         ctx = LLMCallContext(
@@ -121,16 +121,16 @@ class TestNemoFlowLLMMiddleware:
         async def nxt(c):
             return result_ctx
 
-        return await nm.nemo_flow_llm_middleware(ctx, nxt)
+        return await nm.nemo_relay_llm_middleware(ctx, nxt)
 
-    async def test_llm_middleware_calls_nemo_flow_execute(self):
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
-            await self._run_llm_middleware(fake_nemo_flow, nm)
-            fake_nemo_flow.llm.execute.assert_called_once()
+    async def test_llm_middleware_calls_nemo_relay_execute(self):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
+            await self._run_llm_middleware(fake_nemo_relay, nm)
+            fake_nemo_relay.llm.execute.assert_called_once()
 
     async def test_llm_middleware_strips_sensitive_keys(self):
         """The wrapper should receive a request without api_key / base_url."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             captured_request = {}
 
             async def capturing_execute(*args, **kwargs):
@@ -139,7 +139,7 @@ class TestNemoFlowLLMMiddleware:
                 captured_request["req"] = request
                 await wrapper(request)
 
-            fake_nemo_flow.llm.execute.side_effect = capturing_execute
+            fake_nemo_relay.llm.execute.side_effect = capturing_execute
 
             from nooa.runtime.middleware import LLMCallContext
 
@@ -152,7 +152,7 @@ class TestNemoFlowLLMMiddleware:
             async def nxt(c):
                 return result_ctx
 
-            await nm.nemo_flow_llm_middleware(ctx, nxt)
+            await nm.nemo_relay_llm_middleware(ctx, nxt)
             # LLMRequest was constructed — first positional arg to fake cls is {}
             # (the second positional arg is safe_params without api_key)
             call_args = nm.LLMRequest.call_args
@@ -162,7 +162,7 @@ class TestNemoFlowLLMMiddleware:
             assert "tools" not in safe_params
 
     async def test_llm_middleware_returns_captured_ctx(self):
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             from nooa.runtime.middleware import LLMCallContext
 
             ctx = LLMCallContext(messages=[{"role": "user", "content": "hi"}], params={})
@@ -171,17 +171,17 @@ class TestNemoFlowLLMMiddleware:
             async def nxt(c):
                 return inner
 
-            result = await nm.nemo_flow_llm_middleware(ctx, nxt)
+            result = await nm.nemo_relay_llm_middleware(ctx, nxt)
             assert result is inner
 
     async def test_llm_middleware_guardrail_blocks_raises(self):
-        """When nemo_flow.llm.execute() never invokes _wrapper, raise RuntimeError."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        """When nemo_relay.llm.execute() never invokes _wrapper, raise RuntimeError."""
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             # Override execute to NOT call the wrapper (simulates guardrail block)
             async def blocking_execute(*args, **kwargs):
                 pass  # don't call wrapper
 
-            fake_nemo_flow.llm.execute.side_effect = blocking_execute
+            fake_nemo_relay.llm.execute.side_effect = blocking_execute
 
             from nooa.runtime.middleware import LLMCallContext
 
@@ -190,16 +190,16 @@ class TestNemoFlowLLMMiddleware:
             async def nxt(c):
                 return c
 
-            with pytest.raises(RuntimeError, match="NeMo Flow guardrail blocked the LLM call"):
-                await nm.nemo_flow_llm_middleware(ctx, nxt)
+            with pytest.raises(RuntimeError, match="NeMo Relay guardrail blocked the LLM call"):
+                await nm.nemo_relay_llm_middleware(ctx, nxt)
 
     async def test_llm_middleware_with_agent_model(self):
         """Model name is extracted from ctx.agent._llm.model.
 
-        We test this by verifying that nemo_flow.llm.execute receives the model name
+        We test this by verifying that nemo_relay.llm.execute receives the model name
         from the mock agent, not from ctx (which has no agent in this test).
         """
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             captured_calls = []
 
             async def recording_execute(*args, **kwargs):
@@ -209,7 +209,7 @@ class TestNemoFlowLLMMiddleware:
                 captured_calls.append(model_name_pos)
                 await wrapper(request)
 
-            fake_nemo_flow.llm.execute.side_effect = recording_execute
+            fake_nemo_relay.llm.execute.side_effect = recording_execute
 
             from nooa.runtime.middleware import LLMCallContext
 
@@ -222,20 +222,20 @@ class TestNemoFlowLLMMiddleware:
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_llm_middleware(ctx, nxt)
+            await nm.nemo_relay_llm_middleware(ctx, nxt)
             # model_name is "" because agent is None
             assert captured_calls[0] == ""
 
     async def test_llm_middleware_response_with_raw_model_dump(self):
         """When response has raw_response with model_dump, it is used."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
 
             async def execute_and_capture(*args, **kwargs):
                 wrapper = args[2]
                 request = args[1]
                 await wrapper(request)
 
-            fake_nemo_flow.llm.execute.side_effect = execute_and_capture
+            fake_nemo_relay.llm.execute.side_effect = execute_and_capture
 
             from nooa.runtime.middleware import LLMCallContext
 
@@ -252,13 +252,13 @@ class TestNemoFlowLLMMiddleware:
             async def nxt(c):
                 return inner
 
-            result = await nm.nemo_flow_llm_middleware(ctx, nxt)
+            result = await nm.nemo_relay_llm_middleware(ctx, nxt)
             assert result is inner
             raw_resp.model_dump.assert_called_once_with(mode="json")
 
     async def test_llm_middleware_response_with_model_dump_no_raw(self):
         """When response has model_dump but no raw_response, model_dump is used."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             from nooa.runtime.middleware import LLMCallContext
 
             response = MagicMock(spec=["model_dump"])
@@ -272,12 +272,12 @@ class TestNemoFlowLLMMiddleware:
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_llm_middleware(ctx, nxt)
+            await nm.nemo_relay_llm_middleware(ctx, nxt)
             response.model_dump.assert_called_once_with(mode="json")
 
     async def test_llm_middleware_response_assistant_message_fallback(self):
         """When response has assistant_message, fall back to manual serialization."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             from nooa.runtime.middleware import LLMCallContext
 
             response = MagicMock(spec=["assistant_message", "usage", "finish_reason"])
@@ -293,11 +293,11 @@ class TestNemoFlowLLMMiddleware:
                 return inner
 
             # Should not raise
-            await nm.nemo_flow_llm_middleware(ctx, nxt)
+            await nm.nemo_relay_llm_middleware(ctx, nxt)
 
     async def test_llm_middleware_response_none_returns_empty(self):
         """When response is None, wrapper returns {}."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             from nooa.runtime.middleware import LLMCallContext
 
             ctx = LLMCallContext(messages=[{"role": "user", "content": "hi"}], params={})
@@ -308,12 +308,12 @@ class TestNemoFlowLLMMiddleware:
                 return inner
 
             # Should not raise, captured_ctx is inner
-            result = await nm.nemo_flow_llm_middleware(ctx, nxt)
+            result = await nm.nemo_relay_llm_middleware(ctx, nxt)
             assert result is inner
 
     async def test_llm_middleware_request_intercept_propagates_messages(self):
-        """When NeMo Flow request intercept modifies messages, they propagate to ctx."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        """When NeMo Relay request intercept modifies messages, they propagate to ctx."""
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             new_messages = [
                 {"role": "system", "content": "You are helpful"},
                 {"role": "user", "content": "hi"},
@@ -322,11 +322,11 @@ class TestNemoFlowLLMMiddleware:
             async def intercepting_execute(*args, **kwargs):
                 request = args[1]
                 wrapper = args[2]
-                # Simulate NeMo Flow modifying the request
+                # Simulate NeMo Relay modifying the request
                 request.content = {"messages": new_messages}
                 await wrapper(request)
 
-            fake_nemo_flow.llm.execute.side_effect = intercepting_execute
+            fake_nemo_relay.llm.execute.side_effect = intercepting_execute
 
             from nooa.runtime.middleware import LLMCallContext
 
@@ -336,13 +336,13 @@ class TestNemoFlowLLMMiddleware:
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_llm_middleware(ctx, nxt)
+            await nm.nemo_relay_llm_middleware(ctx, nxt)
             # ctx.messages should be updated to new_messages
             assert ctx.messages == new_messages
 
     async def test_llm_middleware_request_intercept_propagates_params(self):
-        """When NeMo Flow request intercept modifies temperature, it propagates."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        """When NeMo Relay request intercept modifies temperature, it propagates."""
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
 
             async def intercepting_execute(*args, **kwargs):
                 request = args[1]
@@ -350,7 +350,7 @@ class TestNemoFlowLLMMiddleware:
                 request.content = {"temperature": 0.1, "seed": 42}
                 await wrapper(request)
 
-            fake_nemo_flow.llm.execute.side_effect = intercepting_execute
+            fake_nemo_relay.llm.execute.side_effect = intercepting_execute
 
             from nooa.runtime.middleware import LLMCallContext
 
@@ -363,13 +363,13 @@ class TestNemoFlowLLMMiddleware:
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_llm_middleware(ctx, nxt)
+            await nm.nemo_relay_llm_middleware(ctx, nxt)
             assert ctx.params["temperature"] == 0.1
             assert ctx.params["seed"] == 42
 
 
 class TestNemoFlowToolMiddleware:
-    """Tests for nemo_flow_tool_middleware (lines 197–258)."""
+    """Tests for nemo_relay_tool_middleware (lines 197–258)."""
 
     async def _make_exec_ctx(self, code="print('hi')", params=None, result=None):
         from nooa.runtime.middleware import ExecutePythonContext
@@ -379,59 +379,59 @@ class TestNemoFlowToolMiddleware:
         inner.result = result
         return ctx, inner
 
-    async def test_tool_middleware_calls_nemo_flow_execute(self):
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+    async def test_tool_middleware_calls_nemo_relay_execute(self):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             ctx, inner = await self._make_exec_ctx()
 
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_tool_middleware(ctx, nxt)
-            fake_nemo_flow.tools.execute.assert_called_once()
+            await nm.nemo_relay_tool_middleware(ctx, nxt)
+            fake_nemo_relay.tools.execute.assert_called_once()
 
     async def test_tool_middleware_returns_captured_ctx(self):
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             ctx, inner = await self._make_exec_ctx()
 
             async def nxt(c):
                 return inner
 
-            result = await nm.nemo_flow_tool_middleware(ctx, nxt)
+            result = await nm.nemo_relay_tool_middleware(ctx, nxt)
             assert result is inner
 
     async def test_tool_middleware_guardrail_blocks_raises(self):
-        """When nemo_flow.tools.execute() never invokes _wrapper, raise RuntimeError."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        """When nemo_relay.tools.execute() never invokes _wrapper, raise RuntimeError."""
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
 
             async def blocking_execute(tool_name, args, wrapper):
                 pass  # don't call wrapper
 
-            fake_nemo_flow.tools.execute.side_effect = blocking_execute
+            fake_nemo_relay.tools.execute.side_effect = blocking_execute
 
             ctx, inner = await self._make_exec_ctx()
 
             async def nxt(c):
                 return inner
 
-            with pytest.raises(RuntimeError, match="NeMo Flow guardrail blocked code execution"):
-                await nm.nemo_flow_tool_middleware(ctx, nxt)
+            with pytest.raises(RuntimeError, match="NeMo Relay guardrail blocked code execution"):
+                await nm.nemo_relay_tool_middleware(ctx, nxt)
 
     async def test_tool_middleware_result_none(self):
         """When result is None, codec.to_json(None) is returned."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             ctx, inner = await self._make_exec_ctx(result=None)
 
             async def nxt(c):
                 return inner
 
-            result = await nm.nemo_flow_tool_middleware(ctx, nxt)
+            result = await nm.nemo_relay_tool_middleware(ctx, nxt)
             assert result is inner
             # codec.to_json(None) should have been called
-            fake_nemo_flow.typed.BestEffortAnyCodec.return_value.to_json.assert_called()
+            fake_nemo_relay.typed.BestEffortAnyCodec.return_value.to_json.assert_called()
 
     async def test_tool_middleware_result_with_returned_value(self):
         """When result.returned_value is set, it is passed to codec."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             from nooa.events import ExecutionResult
 
             exec_result = ExecutionResult(stdout="", returned_value=42)
@@ -440,13 +440,13 @@ class TestNemoFlowToolMiddleware:
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_tool_middleware(ctx, nxt)
-            codec = fake_nemo_flow.typed.BestEffortAnyCodec.return_value
+            await nm.nemo_relay_tool_middleware(ctx, nxt)
+            codec = fake_nemo_relay.typed.BestEffortAnyCodec.return_value
             codec.to_json.assert_called_with(42)
 
     async def test_tool_middleware_result_with_no_return_uses_stdout(self):
         """When result has _NO_RETURN and no signal, stdout is used."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             from nooa.events import _NO_RETURN, ExecutionResult
 
             exec_result = ExecutionResult(stdout="some output", signal=None)
@@ -457,13 +457,13 @@ class TestNemoFlowToolMiddleware:
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_tool_middleware(ctx, nxt)
-            codec = fake_nemo_flow.typed.BestEffortAnyCodec.return_value
+            await nm.nemo_relay_tool_middleware(ctx, nxt)
+            codec = fake_nemo_relay.typed.BestEffortAnyCodec.return_value
             codec.to_json.assert_called_with("some output")
 
     async def test_tool_middleware_result_signal_with_result_key(self):
         """When result has a signal with 'result' key, that is used."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             from nooa.events import _NO_RETURN, ExecutionResult, ExecutionSignal
 
             class TestSignal(ExecutionSignal):
@@ -479,19 +479,19 @@ class TestNemoFlowToolMiddleware:
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_tool_middleware(ctx, nxt)
-            codec = fake_nemo_flow.typed.BestEffortAnyCodec.return_value
+            await nm.nemo_relay_tool_middleware(ctx, nxt)
+            codec = fake_nemo_relay.typed.BestEffortAnyCodec.return_value
             codec.to_json.assert_called_with("signal_value")
 
     async def test_tool_middleware_code_propagation_from_intercept(self):
-        """NeMo Flow intercept can rewrite code; it propagates to ctx."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        """NeMo Relay intercept can rewrite code; it propagates to ctx."""
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
 
             async def intercepting_execute(tool_name, args, wrapper):
                 modified_args = {"code": "print('intercepted')", "timeout": 5}
                 await wrapper(modified_args)
 
-            fake_nemo_flow.tools.execute.side_effect = intercepting_execute
+            fake_nemo_relay.tools.execute.side_effect = intercepting_execute
 
             from nooa.runtime.middleware import ExecutePythonContext
 
@@ -503,12 +503,12 @@ class TestNemoFlowToolMiddleware:
                 assert c.params.get("timeout") == 5
                 return inner
 
-            await nm.nemo_flow_tool_middleware(ctx, nxt)
+            await nm.nemo_relay_tool_middleware(ctx, nxt)
             assert ctx.code == "print('intercepted')"
 
     async def test_tool_middleware_result_signal_without_result_key(self):
         """When signal.result is not a dict with 'result', rv is None."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             from nooa.events import _NO_RETURN, ExecutionResult, ExecutionSignal
 
             class TestSignal(ExecutionSignal):
@@ -524,13 +524,13 @@ class TestNemoFlowToolMiddleware:
             async def nxt(c):
                 return inner
 
-            await nm.nemo_flow_tool_middleware(ctx, nxt)
-            codec = fake_nemo_flow.typed.BestEffortAnyCodec.return_value
+            await nm.nemo_relay_tool_middleware(ctx, nxt)
+            codec = fake_nemo_relay.typed.BestEffortAnyCodec.return_value
             codec.to_json.assert_called_with(None)
 
 
 class TestNemoFlowAgentCallMiddleware:
-    """Tests for nemo_flow_agent_call_middleware (lines 261–281).
+    """Tests for nemo_relay_agent_call_middleware (lines 261–281).
 
     Note: AgentCallContext.agent must be Agent | None.  We use agent=None and
     inject a mock agent into ctx after creation, since the middleware accesses
@@ -544,7 +544,7 @@ class TestNemoFlowAgentCallMiddleware:
         return ctx
 
     async def test_agent_call_pushes_and_pops_scope(self):
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             ctx = self._make_ctx("solve")
 
             # Create a real object so type().__name__ works correctly
@@ -556,28 +556,28 @@ class TestNemoFlowAgentCallMiddleware:
             async def nxt(c):
                 return c
 
-            await nm.nemo_flow_agent_call_middleware(ctx, nxt)
-            fake_nemo_flow.scope.push.assert_called_once()
-            call_args = fake_nemo_flow.scope.push.call_args[0]
+            await nm.nemo_relay_agent_call_middleware(ctx, nxt)
+            fake_nemo_relay.scope.push.assert_called_once()
+            call_args = fake_nemo_relay.scope.push.call_args[0]
             assert call_args[0] == "MyAgent.solve"
-            fake_nemo_flow.scope.pop.assert_called_once()
+            fake_nemo_relay.scope.pop.assert_called_once()
 
     async def test_agent_call_pops_scope_even_on_exception(self):
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             ctx = self._make_ctx("solve")
 
             async def failing_nxt(c):
                 raise ValueError("deliberate error")
 
             with pytest.raises(ValueError, match="deliberate error"):
-                await nm.nemo_flow_agent_call_middleware(ctx, failing_nxt)
+                await nm.nemo_relay_agent_call_middleware(ctx, failing_nxt)
 
             # pop() must still have been called
-            fake_nemo_flow.scope.pop.assert_called_once()
+            fake_nemo_relay.scope.pop.assert_called_once()
 
     async def test_agent_call_scope_name_format(self):
         """Scope name is 'ClassName.method_name'."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             ctx = self._make_ctx("analyze")
 
             class ResearchAgent:
@@ -588,14 +588,14 @@ class TestNemoFlowAgentCallMiddleware:
             async def nxt(c):
                 return c
 
-            await nm.nemo_flow_agent_call_middleware(ctx, nxt)
-            call_args = fake_nemo_flow.scope.push.call_args[0]
+            await nm.nemo_relay_agent_call_middleware(ctx, nxt)
+            call_args = fake_nemo_relay.scope.push.call_args[0]
             assert call_args[0] == "ResearchAgent.analyze"
 
     async def test_agent_call_scope_pop_failure_is_swallowed(self):
         """Even if scope.pop() raises, no exception propagates."""
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
-            fake_nemo_flow.scope.pop.side_effect = RuntimeError("pop failed")
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
+            fake_nemo_relay.scope.pop.side_effect = RuntimeError("pop failed")
 
             ctx = self._make_ctx("run")
 
@@ -603,10 +603,10 @@ class TestNemoFlowAgentCallMiddleware:
                 return c
 
             # Should not raise even though pop raises
-            await nm.nemo_flow_agent_call_middleware(ctx, nxt)
+            await nm.nemo_relay_agent_call_middleware(ctx, nxt)
 
     async def test_agent_call_returns_nxt_result(self):
-        with _nemo_flow_patched() as (nm, fake_nemo_flow, _):
+        with _nemo_relay_patched() as (nm, fake_nemo_relay, _):
             ctx = self._make_ctx("run")
             expected = self._make_ctx("run")
             expected.result = "final_result"
@@ -614,7 +614,7 @@ class TestNemoFlowAgentCallMiddleware:
             async def nxt(c):
                 return expected
 
-            result = await nm.nemo_flow_agent_call_middleware(ctx, nxt)
+            result = await nm.nemo_relay_agent_call_middleware(ctx, nxt)
             assert result is expected
 
 
