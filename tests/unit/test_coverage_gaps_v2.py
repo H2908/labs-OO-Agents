@@ -1131,7 +1131,7 @@ class TestDebugHandlerTraceback:
 # =============================================================================
 
 
-class TestNemoFlowMiddlewareLLMModelName:
+class TestNemoRelayMiddlewareLLMModelName:
     """_llm_interceptor with agent._llm sets model_name (lines 99-101).
 
     Note: This test exercises the extraction logic through the agent attribute
@@ -2404,7 +2404,7 @@ class TestMethodWrapperNonGenerationDirect:
 # =============================================================================
 
 
-class TestNemoFlowMiddlewareAgentLlmPath:
+class TestNemoRelayMiddlewareAgentLlmPath:
     """nemo_relay_middleware lines 99-101 and 169 require nemo_relay available."""
 
     def test_serialize_response_unknown_type_returns_empty_dict(self):

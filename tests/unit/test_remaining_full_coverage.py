@@ -813,7 +813,7 @@ class TestSQLiteModuleLevelAssertions:
 # =============================================================================
 
 
-class TestNemoFlowMiddlewareModelExtraction:
+class TestNemoRelayMiddlewareModelExtraction:
     """Lines 99-101: model_name extracted from ctx.agent._llm.model."""
 
     @pytest.mark.asyncio
@@ -855,7 +855,7 @@ class TestNemoFlowMiddlewareModelExtraction:
                 importlib.reload(nm)
 
 
-class TestNemoFlowWrapperFallbackReturn:
+class TestNemoRelayWrapperFallbackReturn:
     """Line 169: _wrapper returns {} when resp has no recognized attributes."""
 
     @pytest.mark.asyncio

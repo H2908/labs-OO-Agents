@@ -93,8 +93,8 @@ sandbox = [
 mcp = [
     "mcp>=1.0.0",
 ]
-# NeMo Flow integration (guardrails, intercepts, event subscribers, ATIF
-# export). The upstream package was renamed from nemo-flow to nemo-relay.
+# NeMo Relay integration (guardrails, intercepts, event subscribers, ATIF
+# export).
 # See src/nooa/nemo_relay_middleware.py and examples/quickstart/15_nemo_relay.py.
 #
 # Floor is 0.6: LLM request intercepts must return `LLMRequestInterceptOutcome`

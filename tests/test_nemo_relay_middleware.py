@@ -589,7 +589,7 @@ class TestModelNameExtraction:
 # ===================================================================
 
 
-class TestInstallNemoFlowAndScope:
+class TestInstallNemoRelayAndScope:
     """Verify install_nemo_relay() and nemo_relay_scope() lifecycle."""
 
     def test_install_nemo_relay_registers_three_middleware(self):
@@ -966,7 +966,7 @@ class TestLLMMiddlewareEdgeCases:
 # ===================================================================
 
 
-class TestNemoFlowScopeExceptionSafety:
+class TestNemoRelayScopeExceptionSafety:
     """Verify nemo_relay_scope cleans up middleware when the body raises."""
 
     @pytest.mark.asyncio

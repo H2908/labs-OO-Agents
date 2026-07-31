@@ -239,7 +239,7 @@ def _nemo_relay_patched():
     importlib.reload(nm)
 
 
-class TestNemoFlowMiddlewareWithoutNemoFlow:
+class TestNemoRelayMiddlewareWithoutNemoRelay:
     """When nemo_relay is not installed, install_nemo_relay and nemo_relay_scope raise ImportError."""
 
     def test_install_nemo_relay_raises_import_error(self, monkeypatch):
@@ -258,7 +258,7 @@ class TestNemoFlowMiddlewareWithoutNemoFlow:
                 pass
 
 
-class TestNemoFlowMiddlewareWithFakeNemoFlow:
+class TestNemoRelayMiddlewareWithFakeNemoRelay:
     """Tests with nemo_relay mocked in sys.modules."""
 
     def test_has_nemo_relay_true_when_patched(self):

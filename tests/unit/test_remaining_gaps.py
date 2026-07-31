@@ -93,7 +93,7 @@ def _nemo_relay_patched():
 # ===========================================================================
 
 
-class TestNemoFlowLLMMiddleware:
+class TestNemoRelayLLMMiddleware:
     """Tests for nemo_relay_llm_middleware (lines 92–184)."""
 
     async def _run_llm_middleware(self, fake_nemo_relay, nm, ctx_kwargs=None, nxt_response=None):
@@ -368,7 +368,7 @@ class TestNemoFlowLLMMiddleware:
             assert ctx.params["seed"] == 42
 
 
-class TestNemoFlowToolMiddleware:
+class TestNemoRelayToolMiddleware:
     """Tests for nemo_relay_tool_middleware (lines 197–258)."""
 
     async def _make_exec_ctx(self, code="print('hi')", params=None, result=None):
@@ -529,7 +529,7 @@ class TestNemoFlowToolMiddleware:
             codec.to_json.assert_called_with(None)
 
 
-class TestNemoFlowAgentCallMiddleware:
+class TestNemoRelayAgentCallMiddleware:
     """Tests for nemo_relay_agent_call_middleware (lines 261–281).
 
     Note: AgentCallContext.agent must be Agent | None.  We use agent=None and
