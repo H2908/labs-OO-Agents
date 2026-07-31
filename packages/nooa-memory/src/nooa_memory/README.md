@@ -431,7 +431,7 @@ fit the budget, and *hurts* pinpoint lookups.
 | `monitoring.py` | `MemoryStats` + runtime memory events |
 | `manager.py` | `MemoryManager` (install/hooks/ops) + `MemoryToolsMixin` + `MEMORY_SCHEMA_GUIDE` |
 
-Tests: [`tests/memory/`](../../../tests/memory/).
+Tests: [`tests/memory/`](../../tests/memory/).
 
 ---
 
