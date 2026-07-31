@@ -1,4 +1,4 @@
-# Rust toolchain (installed for nemo_flow PyO3 build)
+# Rust toolchain (installed for nemo_relay PyO3 build)
 .cargo/
 .rustup/
 
@@ -296,7 +296,7 @@ agents/**/traces/
 .config/
 .local/
 
-# Rust toolchain (installed by rustup for nemo-flow build)
+# Rust toolchain (installed by rustup for nemo-relay build)
 .cargo/
 .rustup/
 

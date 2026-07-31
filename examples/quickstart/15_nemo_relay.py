@@ -36,7 +36,7 @@ except ModuleNotFoundError:
     sys.exit(0)
 from pydantic import BaseModel
 
-from nooa.nemo_flow_middleware import nemo_flow_scope
+from nooa.nemo_relay_middleware import nemo_relay_scope
 from nooa.util.quickstart import *
 
 # ---------------------------------------------------------------------------
@@ -245,12 +245,12 @@ async def main():
 
     print("Running ResearchAgent under NeMo Relay runtime...\n")
 
-    # nemo_flow_scope() installs NeMo Relay middleware (agent_call, llm_call,
+    # nemo_relay_scope() installs NeMo Relay middleware (agent_call, llm_call,
     # execute_python) on the agent's event_manager and wraps everything in a
     # root Agent scope.  All LLM calls and code executions inside this block
     # go through the NeMo Relay pipeline.
     agent = ResearchAgent()
-    async with nemo_flow_scope(agent, "research-agent"):
+    async with nemo_relay_scope(agent, "research-agent"):
         result = await agent.summarize("recent advances in quantum error correction")
 
     print("\n--- Result ---")
@@ -277,7 +277,7 @@ async def main():
 
     guardrail_agent = GuardrailDemoAgent()
     try:
-        async with nemo_flow_scope(guardrail_agent, "guardrail-demo"):
+        async with nemo_relay_scope(guardrail_agent, "guardrail-demo"):
             await guardrail_agent.run_shell_command()
         print("\n  ERROR: guardrail did not trigger (unexpected)")
     except Exception as exc:
@@ -303,7 +303,7 @@ async def main():
     for method_name, method in demo_cases:
         _captured_tool_outputs.clear()
 
-        async with nemo_flow_scope(demo_agent, f"demo-{method_name}"):
+        async with nemo_relay_scope(demo_agent, f"demo-{method_name}"):
             value = await method()
 
         nemo_relay.subscribers.flush()
@@ -340,7 +340,7 @@ async def main():
 
     print("\n" + "=" * 70)
     print("What happened under the hood:")
-    print("  - nemo_flow_scope() installed middleware on the agent's event_manager")
+    print("  - nemo_relay_scope() installed middleware on the agent's event_manager")
     print("  - agent_call middleware pushed a ScopeType.Function scope per method")
     print("  - Nested generation: summarize() → fact_check() created nested scopes")
     print("      → Both inner LLM and tool calls flowed through the NeMo Relay pipeline")
