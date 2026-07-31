@@ -205,7 +205,10 @@ def _post_json(
                 n_items,
                 tag,
             )
-        headers = {"Content-Type": "application/json"}
+        from nooa.tracing._viewer_auth import apply_viewer_auth
+
+        # A remote viewer rejects unauthenticated writes with 403.
+        headers = apply_viewer_auth({"Content-Type": "application/json"})
         if session_id:
             # The receiver's /v1/journal/blocks route uses this header to
             # key blocks per session.  /v1/journal/calls reads session_id
