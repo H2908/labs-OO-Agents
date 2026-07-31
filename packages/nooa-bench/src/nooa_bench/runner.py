@@ -35,10 +35,15 @@ import click
 
 logger = logging.getLogger("nooa_bench.runner")
 
-# Harbor container path conventions
+# Harbor container path conventions.
+#
+# Harbor bind-mounts ONLY /logs/agent and /logs/verifier from the host
+# (harbor.models.trial.paths). Everything else under /logs lives in the
+# container's own writable layer and is destroyed when the trial container is
+# removed -- which is the default. Traces therefore have to be written inside
+# /logs/agent to survive the run; /logs/artifacts silently discarded them.
 LOGS_DIR = Path("/logs/agent")
-ARTIFACTS_DIR = Path("/logs/artifacts")
-TRACES_DIR = ARTIFACTS_DIR / "traces"
+TRACES_DIR = LOGS_DIR / "traces"
 ANSWER_FILE = Path("/app/answer.txt")
 
 
@@ -60,7 +65,7 @@ def _setup_logging() -> None:
 def _setup_tracing(model: str, agent_type: str) -> None:
     """Enable OTel tracing, always on disk and additionally live when reachable.
 
-    JSONL files in the Harbor artifact directory (``/logs/artifacts/traces/``)
+    JSONL files under ``/logs/agent/traces/`` (a host-mounted directory)
     are written unconditionally — they are the record failure analysis runs on,
     and they are importable later via ``nemo-oo import-harbor``.  When
     ``OTLP_ENDPOINT`` (default ``http://localhost:5001``) is reachable the
@@ -135,11 +140,11 @@ def _write_result(result: dict[str, Any], model: str, agent_type: str) -> None:
 def _write_trajectory(agent: Any) -> None:
     """Dump the agent's full event history to LOGS_DIR/trajectory.json.
 
-    The OTLP spans under ``/logs/artifacts/traces/`` remain the canonical
-    record, but failure analysis starts in the per-task ``agent/`` directory —
-    which otherwise holds only ``nooa_bench.log`` and a ``result.json``
-    carrying just the final response.  Anyone looking there for the turn-by-turn
-    trajectory previously found nothing.
+    The OTLP spans under ``agent/traces/`` remain the canonical record, but
+    failure analysis starts in the per-task ``agent/`` directory — which
+    otherwise holds only ``nooa_bench.log`` and a ``result.json`` carrying just
+    the final response.  Anyone looking there for the turn-by-turn trajectory
+    previously found nothing.
     """
     manager = getattr(agent, "event_manager", None)
     if manager is None:
