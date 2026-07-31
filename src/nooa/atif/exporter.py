@@ -167,8 +167,16 @@ _MEDIA_TYPE_TO_EXT: dict[str, str] = {
 
 
 def _iso8601_utc(dt: datetime | None = None) -> str:
-    """ISO 8601 UTC timestamp (with millisecond precision and Z suffix)."""
-    dt = dt or datetime.now(UTC)
+    """ISO 8601 UTC timestamp (with millisecond precision and Z suffix).
+
+    ``dt`` is normalised to UTC first: the ``Z`` suffix asserts UTC, so
+    formatting a local-time value verbatim would mislabel it.  Event
+    timestamps arrive naive (local), while the default is already aware —
+    without the conversion a single trajectory mixes both, leaving steps
+    out of chronological order by the local UTC offset.  A naive value is
+    interpreted as local time, which is what the event system produces.
+    """
+    dt = datetime.now(UTC) if dt is None else dt.astimezone(UTC)
     return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
 
 
