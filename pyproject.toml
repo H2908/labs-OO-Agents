@@ -12,6 +12,15 @@ authors = [
     {name = "NVIDIA NeMo Team"}
 ]
 requires-python = ">=3.12,<3.14"
+keywords = ["agents", "llm", "codeact", "event-sourcing", "orchestration", "nemo"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "pydantic>=2.5.0",
     # context_blocks + unifiedllm now ship as nooa.context_blocks /
@@ -23,6 +32,12 @@ dependencies = [
     "httpx>=0.27.0",
     "openinference-instrumentation-litellm>=0.1.30",
 ]
+
+[project.urls]
+Homepage = "https://github.com/NVIDIA-NeMo/labs-OO-Agents"
+Repository = "https://github.com/NVIDIA-NeMo/labs-OO-Agents"
+Changelog = "https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/CHANGELOG.md"
+Issues = "https://github.com/NVIDIA-NeMo/labs-OO-Agents/issues"
 
 [project.scripts]
 trace-explorer = "nooa.trace_explorer:main"
@@ -62,6 +77,18 @@ members = [
 
 
 [project.optional-dependencies]
+# Convenience aliases for the sibling distributions, so `pip install
+# nooa[cli]` does what a user reasonably expects. Without these, that command
+# *succeeds* with only a warning and silently installs no CLI.
+#
+# These are deliberately circular (nooa[cli] -> nooa-cli -> nooa); pip and uv
+# both resolve that fine, and it is the standard pattern for a split
+# core/plugin distribution. No version floor, matching the existing policy in
+# packages/*/pyproject.toml: published wheels declare what they actually need
+# rather than being locked to their co-released version.
+cli = ["nooa-cli"]
+memory = ["nooa-memory"]
+bench = ["nooa-bench"]
 # ARC-AGI-3 example agent (examples/arc_agi_3): the public ARC-AGI-3 SDK + deps.
 # Install with `pip install "nemo-oo-agents[arc]"` (or `uv sync --extra arc`).
 arc = [
@@ -186,8 +213,7 @@ testpaths = [
     "tests/unifiedllm",
     "tests/tracing",
     "tests/test_mcp",
-    "packages/nooa-cli/tests/cli",
-    "packages/nooa-cli/tests/integration",
+    "packages/nooa-cli/tests",
     "packages/nooa-bench/tests",
     "tests/trace_explorer",
 ]
@@ -246,7 +272,13 @@ disable_error_code = ["empty-body", "return", "call-arg"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["worktrees", ".vscode-server", ".claude", "examples/arc_agi_3/arc_agi_3"]
+extend-exclude = [
+    "worktrees",
+    ".vscode-server",
+    ".claude",
+    "examples/arc_agi_3/arc_agi_3",
+    "examples/cybergym/task_artifacts",
+]
 
 [tool.ruff.lint]
 select = [

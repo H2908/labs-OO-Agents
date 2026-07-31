@@ -190,7 +190,9 @@ def probe_otlp_endpoint(endpoint: str, timeout: float | None = None) -> bool:
     base = endpoint.rstrip("/").removesuffix("/v1/traces").removesuffix("/v1")
     health_url = f"{base}/api/eval/health"
     try:
-        req = urllib.request.Request(health_url, method="GET")
+        from nooa.tracing._viewer_auth import apply_viewer_auth
+
+        req = urllib.request.Request(health_url, headers=apply_viewer_auth({}), method="GET")
         with urllib.request.urlopen(req, timeout=timeout):
             pass
         return True

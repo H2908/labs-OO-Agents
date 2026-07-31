@@ -256,7 +256,11 @@ class TestPositionBasedInjection:
 
     @pytest.fixture
     def client(self):
-        return CompletionClient(model="test-model", cache_control_injection_points=[])
+        # Anthropic model: the parts form is used only for Anthropic; non-Anthropic
+        # marks at the message level (see test_anthropic_detection.py).
+        return CompletionClient(
+            model="anthropic/claude-sonnet-4-5", cache_control_injection_points=[]
+        )
 
     def test_last_assistant_marked(self, client):
         """position='last' marks only the last message of the specified role (content-block level)."""

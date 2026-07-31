@@ -103,11 +103,14 @@ class OtlpJsonHttpExporter(SpanExporter):
             ``SpanExportResult.SUCCESS`` on HTTP 2xx, ``FAILURE`` otherwise.
         """
         try:
+            from nooa.tracing._viewer_auth import apply_viewer_auth
+
             data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
             req = urllib.request.Request(
                 self._endpoint,
                 data=data,
-                headers={"Content-Type": "application/json"},
+                # A remote viewer rejects unauthenticated writes with 403.
+                headers=apply_viewer_auth({"Content-Type": "application/json"}),
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=10) as resp:

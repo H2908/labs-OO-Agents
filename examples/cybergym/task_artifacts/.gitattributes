@@ -1,0 +1,10 @@
+# CyberGym PoC reproducers are submission evidence: byte-exact fuzzer inputs that
+# only trigger their target crash if preserved verbatim. Many are PDFs, which git
+# and pre-commit both misdetect as text because their headers are ASCII.
+#
+# Marking them binary stops end-of-line normalization on add/checkout no matter
+# what a collaborator's core.autocrlf is set to, and suppresses textual diff/merge.
+# The pre-commit `exclude` in .pre-commit-config.yaml covers the hook side.
+#
+# Scoped to submissions/ only — output.txt and result.txt stay diffable text.
+**/submissions/** binary

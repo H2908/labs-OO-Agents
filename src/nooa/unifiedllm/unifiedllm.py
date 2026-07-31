@@ -1280,12 +1280,18 @@ class UnifiedLLM(ABC):
                         msg["cache_control"] = {"type": "ephemeral"}
                         break
 
+        # Anthropic needs cache_control on a content block (parts form); other providers
+        # reject a content list on non-user roles, so mark at the message level instead.
+        anthropic = _is_anthropic_model(self.model)
         for role in roles_to_cache_last:
             # Search for matching messages by role OR by equivalent native type
             native_type = _ROLE_TO_TYPE.get(role)
             for msg in reversed(messages):
                 if msg.get("role") == role or (native_type and msg.get("type") == native_type):
-                    self._inject_cache_control_on_content(msg)
+                    if anthropic:
+                        self._inject_cache_control_on_content(msg)
+                    else:
+                        msg["cache_control"] = {"type": "ephemeral"}
                     break
 
         return messages
