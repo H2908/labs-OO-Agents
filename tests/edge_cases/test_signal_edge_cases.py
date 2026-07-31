@@ -40,6 +40,10 @@ class GatedFakeLLM(FakeLLMClient):
 
     Lets tests schedule concurrent "signal" work while a generation session
     is still open (stock FakeLLMClient returns instantly).
+
+    ``acall_entries`` counts how many times ``acall`` has been entered (before
+    waiting on ``gate``), so tests can assert a nested generation is still
+    blocked on the actor lock rather than parked on the same gate.
     """
 
     def __init__(
@@ -50,6 +54,7 @@ class GatedFakeLLM(FakeLLMClient):
     ):
         super().__init__(scripted_responses=scripted_responses)
         self.entered = asyncio.Event()
+        self.acall_entries = 0
         self.gate = gate if gate is not None else asyncio.Event()
         if gate is None:
             self.gate.set()
@@ -61,6 +66,7 @@ class GatedFakeLLM(FakeLLMClient):
         output_model: type | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
+        self.acall_entries += 1
         self.entered.set()
         await self.gate.wait()
         return await super().acall(messages, tools=tools, output_model=output_model, **kwargs)
@@ -76,6 +82,7 @@ class SignalAgent(Agent, llm=_TEST_LLM):
         super().__init__(**kwargs)
         self.logged_events: list[str] = []
         self.order: list[str] = []
+        self.signal_entered = asyncio.Event()
 
     @strategy(PurePythonStrategy())
     async def long_gen(self) -> str:
@@ -95,9 +102,29 @@ class SignalAgent(Agent, llm=_TEST_LLM):
     async def signal_calls_gen(self) -> str:
         """Implemented method that awaits a generation method (needs the lock)."""
         self.order.append("signal-enter")
+        self.signal_entered.set()
         result = await self.nested_gen()
         self.order.append("signal-exit")
         return result
+
+
+async def _assert_nested_blocked_on_lock(
+    fake: GatedFakeLLM,
+    agent: SignalAgent,
+    sig_task: asyncio.Task[Any],
+) -> None:
+    """Wait until the signal has started, then assert nested gen has not reached the LLM."""
+    await asyncio.wait_for(agent.signal_entered.wait(), timeout=1.0)
+    # Give nested_gen several event-loop turns to incorrectly enter acall if unlocked.
+    for _ in range(20):
+        if fake.acall_entries > 1 or sig_task.done():
+            break
+        await asyncio.sleep(0)
+    assert fake.acall_entries == 1, (
+        f"nested generation entered LLM while outer still held the lock "
+        f"(acall_entries={fake.acall_entries})"
+    )
+    assert not sig_task.done()
 
 
 @pytest.mark.asyncio
@@ -116,6 +143,7 @@ async def test_signal_queued_during_generation_session():
     # Signal completed while generation was still held open.
     assert agent.logged_events == ["signal-mid"]
     assert not gen_task.done()
+    assert fake.acall_entries == 1
 
     gate.set()
     assert await gen_task == "done"
@@ -137,17 +165,17 @@ async def test_signal_that_calls_strategy_method_needing_generation():
 
     gen_task = asyncio.create_task(agent.long_gen())
     await fake.entered.wait()
+    assert fake.acall_entries == 1
 
     sig_task = asyncio.create_task(agent.signal_calls_gen())
-    # Give the signal time to enter and block on the generation lock.
-    await asyncio.sleep(0.05)
+    await _assert_nested_blocked_on_lock(fake, agent, sig_task)
     assert agent.order == ["signal-enter"]
-    assert not sig_task.done()
 
     gate.set()
     assert await gen_task == "outer"
     assert await sig_task == "from-sig"
     assert fake.call_count == 2
+    assert fake.acall_entries == 2
     assert agent.order == ["signal-enter", "signal-exit"]
 
 
@@ -166,6 +194,7 @@ async def test_multiple_signals_queued_during_long_generation():
 
     assert agent.logged_events == [f"signal-{i}" for i in range(5)]
     assert not gen_task.done()
+    assert fake.acall_entries == 1
 
     gate.set()
     assert await gen_task == "done"
@@ -187,17 +216,17 @@ async def test_mixed_signals_during_generation_lock_and_no_lock():
 
     gen_task = asyncio.create_task(agent.long_gen())
     await fake.entered.wait()
+    assert fake.acall_entries == 1
 
     free_sig = asyncio.create_task(agent.log_signal("free"))
     blocked_sig = asyncio.create_task(agent.signal_calls_gen())
     await asyncio.wait_for(free_sig, timeout=1.0)
-    await asyncio.sleep(0.05)
-
+    await _assert_nested_blocked_on_lock(fake, agent, blocked_sig)
     assert agent.logged_events == ["signal-free"]
     assert agent.order == ["signal-free", "signal-enter"]
-    assert not blocked_sig.done()
 
     gate.set()
     assert await gen_task == "outer"
     assert await blocked_sig == "from-sig"
+    assert fake.acall_entries == 2
     assert agent.order == ["signal-free", "signal-enter", "signal-exit"]
