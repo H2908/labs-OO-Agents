@@ -202,8 +202,7 @@ testpaths = [
     "tests/unifiedllm",
     "tests/tracing",
     "tests/test_mcp",
-    "packages/nooa-cli/tests/cli",
-    "packages/nooa-cli/tests/integration",
+    "packages/nooa-cli/tests",
     "packages/nooa-bench/tests",
     "tests/trace_explorer",
 ]

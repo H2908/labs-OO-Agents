@@ -101,6 +101,35 @@ def command(args: tuple[str, ...]):
     subprocess.run([sys.executable, "-m", "some_other_tool", *args])
 ```
 
+## Commands From Another Package
+
+If your command lives in a *different* installed package (not in this repo),
+register it in the `nooa_cli.commands` entry-point group instead of dropping a
+file here. The entry-point name becomes the subcommand name:
+
+```toml
+# pyproject.toml of your package
+[project.entry-points."nooa_cli.commands"]
+tui  = "my_package.cli.tui:command"
+term = "my_package.cli.term:command"
+```
+
+`my_package.cli.tui:command` must be a `click.Command` or `click.Group` — the
+same contract as an in-repo command module.
+
+- **Built-ins win name collisions.** A plugin can't shadow `eval`, `config`,
+  or anything else shipped here; it's logged and skipped.
+- **A broken plugin is skipped, not fatal.** An entry point that fails to
+  import, or that resolves to a non-`click.Command`, logs a warning and is
+  left out. `nooa` keeps working.
+- Plugins register in entry-point-name order, so `nooa --help` is stable
+  regardless of install order.
+- The **Performance Rule** below applies with extra force: every registered
+  entry point is loaded on *every* `nooa` invocation, including `nooa --help`.
+  Keep heavy imports inside the handler.
+
+This mirrors the existing `nooa.skills` and `nooa.bundled_configs` groups.
+
 ## Shared Utilities
 
 Common helpers live in `src/nooa_cli/_common.py`:
