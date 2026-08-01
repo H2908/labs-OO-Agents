@@ -87,7 +87,10 @@ jobs:
           # Exact pin: this job's output IS the security property, so the
           # toolchain producing it should not float. Output was verified
           # byte-identical on 20.19.5 and 22.20.0, so a bump is safe.
-          node-version: "20.19.5"
+          # Floor is now react-router 8.3.0's `engines.node: >=22.22.0` — the
+          # only release patching GHSA-qwww-vcr4-c8h2 — so this cannot go back
+          # below 22.22.0 without reintroducing that advisory.
+          node-version: "22.23.2"
       - name: Rebuild the viewer bundle from source
         working-directory: src/nooa/viewer/frontend-react
         run: |
