@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""CyberGym-native nooa agent package."""
+"""CyberGym-native NOOA agent package."""
 
 __all__ = ["__version__"]
 

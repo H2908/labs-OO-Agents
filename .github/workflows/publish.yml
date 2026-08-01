@@ -1,0 +1,224 @@
+# Publishes the four workspace packages to PyPI.
+#
+# Trigger: a GitHub Release is *published* (the release's tag `vX.Y.Z` is what
+# uv-dynamic-versioning turns into the package version — see RELEASING.md).
+# Auth: PyPI Trusted Publishing (OIDC). No API tokens, no repo secrets.
+#
+# `workflow_dispatch` runs the same build against TestPyPI for a dry run.
+#
+# Every `uses:` here is an `actions/*` action, i.e. GitHub-created. That is
+# deliberate: this org enforces an Actions allowlist, and a disallowed action
+# fails the *entire workflow* at startup (see PR #50 — one blocked action left
+# CI dead for 8 days). A publish workflow that cannot start is a publish
+# workflow that silently never ships. uv is installed from a pinned, versioned
+# install script and does the upload itself via `uv publish`.
+name: Publish
+
+on:
+  release:
+    types: [published]
+  # Manual runs are ALWAYS a TestPyPI dry run. There is deliberately no input
+  # to select the index: real PyPI is reachable only by publishing a GitHub
+  # Release, so a mis-click here cannot burn a version number on PyPI.
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  # Pinned: the install script is fetched at runtime, so an unversioned URL
+  # would make every run depend on whatever uv ships that day.
+  UV_VERSION: "0.11.4"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tags needed for uv-dynamic-versioning
+
+      - name: Install uv
+        run: |
+          set -euo pipefail
+          curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # --no-sources: build with `tool.uv.sources` disabled, so the build is
+      # exercised the way a non-uv consumer's build backend would see it. Without
+      # it, a workspace source could paper over a dependency that is unresolvable
+      # off this machine. Recommended by
+      # https://docs.astral.sh/uv/guides/package/
+      - name: Build all packages
+        run: |
+          rm -rf dist
+          for pkg in nooa nooa-cli nooa-memory nooa-bench; do
+            uv build --no-sources --package "$pkg" --out-dir dist
+          done
+          ls -l dist
+
+      # Guards the two ways a release can silently ship the wrong version:
+      # a shallow checkout (no tag reachable -> `.devN`), or a Release created
+      # from a commit that is not the tagged one.
+      - name: Check built version matches the release tag
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          uv run --no-project --with packaging python - <<'PY'
+          import os, pathlib, sys
+          from packaging.utils import parse_wheel_filename
+          from packaging.version import Version
+
+          expected = Version(os.environ["TAG"].removeprefix("v"))
+          wheels = sorted(pathlib.Path("dist").glob("*.whl"))
+          assert len(wheels) == 4, f"expected 4 wheels, got {[w.name for w in wheels]}"
+          for whl in wheels:
+              _, version, _, _ = parse_wheel_filename(whl.name)
+              if version.is_devrelease:
+                  sys.exit(f"{whl.name}: dev version — the tag is not reachable from HEAD")
+              if version != expected:
+                  sys.exit(f"{whl.name}: built {version}, but the tag says {expected}")
+          print(f"OK — all four packages built as {expected}")
+          PY
+
+      # Catches a broken wheel before it is on PyPI forever.
+      - name: Smoke-test the wheels in a clean environment
+        run: |
+          uv venv /tmp/smoke --python 3.12
+          VIRTUAL_ENV=/tmp/smoke uv pip install \
+            dist/nooa-*.whl dist/nooa_cli-*.whl dist/nooa_memory-*.whl dist/nooa_bench-*.whl
+          /tmp/smoke/bin/python -c "import nooa, nooa_cli, nooa_memory, nooa_bench; print(nooa.__version__)"
+          /tmp/smoke/bin/nooa --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  # One job per package, each in its OWN environment (`pypi-<package>`).
+  #
+  # PyPI keys a *pending* trusted publisher on
+  # (owner, repo, workflow filename, environment). Four packages sharing one
+  # environment collide: PyPI rejects the 2nd registration with "a pending
+  # trusted publisher matching this configuration has already been registered
+  # for a different project name", because it cannot tell which project to
+  # create on first upload. A distinct environment per package makes each
+  # tuple unique. (The constraint applies only while a publisher is pending —
+  # but a distinct environment is also what gives per-package approval gates.)
+  publish-testpypi:
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false  # a partial publish is recoverable; a cancelled one is messier
+      matrix:
+        package: [nooa, nooa-cli, nooa-memory, nooa-bench]
+    environment:
+      name: testpypi-${{ matrix.package }}
+      url: https://test.pypi.org/p/${{ matrix.package }}
+    permissions:
+      id-token: write  # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      # Upload only this package's files. Distribution filenames normalise `-`
+      # to `_`, and the glob anchors on the `-` before the version, so
+      # `nooa-*` matches nooa's own files and never `nooa_cli-*`.
+      - name: Isolate this package's artifacts
+        env:
+          PKG: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          mkdir upload
+          cp dist/"${PKG//-/_}"-* upload/
+          test "$(ls upload | wc -l)" -eq 2  # exactly one wheel + one sdist
+          ls -l upload
+      - name: Install uv
+        run: |
+          set -euo pipefail
+          curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # --trusted-publishing always: never silently fall back to looking for a
+      # token if the OIDC exchange fails. Fail instead, so a broken publisher
+      # config surfaces as an error rather than an auth prompt.
+      - name: Publish to TestPyPI
+        run: |
+          uv publish --trusted-publishing always \
+            --publish-url https://test.pypi.org/legacy/ \
+            --check-url https://test.pypi.org/simple/ \
+            upload/*
+
+  publish-pypi:
+    needs: build
+    # Real PyPI is reachable ONLY from a published GitHub Release.
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [nooa, nooa-cli, nooa-memory, nooa-bench]
+    environment:
+      name: pypi-${{ matrix.package }}
+      url: https://pypi.org/p/${{ matrix.package }}
+    permissions:
+      id-token: write  # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      # Upload only this package's files. Distribution filenames normalise `-`
+      # to `_`, and the glob anchors on the `-` before the version, so
+      # `nooa-*` matches nooa's own files and never `nooa_cli-*`.
+      - name: Isolate this package's artifacts
+        env:
+          PKG: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          mkdir upload
+          cp dist/"${PKG//-/_}"-* upload/
+          test "$(ls upload | wc -l)" -eq 2  # exactly one wheel + one sdist
+          ls -l upload
+      - name: Install uv
+        run: |
+          set -euo pipefail
+          curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # --trusted-publishing always: never silently fall back to looking for a
+      # token if the OIDC exchange fails. Fail instead, so a broken publisher
+      # config surfaces as an error rather than an auth prompt.
+      #
+      # --check-url makes a re-run idempotent: already-uploaded files are
+      # skipped rather than erroring. Matters because `fail-fast: false` means
+      # a partial publish is a state you can land in and need to resume from.
+      - name: Publish to PyPI
+        run: |
+          uv publish --trusted-publishing always \
+            --check-url https://pypi.org/simple/ \
+            upload/*
+
+  # Attach the built wheels to the GitHub Release so `pip install <url>` and
+  # air-gapped consumers get the exact artifacts that went to PyPI.
+  attach-to-release:
+    needs: publish-pypi
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      # The tag name goes through `env:`, not `${{ }}` inside the script.
+      # GitHub expands `${{ }}` textually *before* bash parses the line, so a
+      # tag containing `$(...)` or backticks would execute — double quotes do
+      # not help, because the substitution happens before quoting is applied.
+      # This job holds `contents: write`. Via env, bash sees the value as data.
+      - name: Attach artifacts to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY"

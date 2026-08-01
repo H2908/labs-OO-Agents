@@ -35,10 +35,15 @@ import click
 
 logger = logging.getLogger("nooa_bench.runner")
 
-# Harbor container path conventions
+# Harbor container path conventions.
+#
+# Harbor bind-mounts ONLY /logs/agent and /logs/verifier from the host
+# (harbor.models.trial.paths). Everything else under /logs lives in the
+# container's own writable layer and is destroyed when the trial container is
+# removed -- which is the default. Traces therefore have to be written inside
+# /logs/agent to survive the run; /logs/artifacts silently discarded them.
 LOGS_DIR = Path("/logs/agent")
-ARTIFACTS_DIR = Path("/logs/artifacts")
-TRACES_DIR = ARTIFACTS_DIR / "traces"
+TRACES_DIR = LOGS_DIR / "traces"
 ANSWER_FILE = Path("/app/answer.txt")
 
 
@@ -58,16 +63,17 @@ def _setup_logging() -> None:
 
 
 def _setup_tracing(model: str, agent_type: str) -> None:
-    """Enable OTel tracing, publishing live to the viewer if reachable.
+    """Enable OTel tracing, always on disk and additionally live when reachable.
 
-    Detection order:
-    1. Probe ``OTLP_ENDPOINT`` env var, or ``http://localhost:5001`` by default.
-    2. If reachable → stream spans via the journal exporter with ``eval.model``
-       and ``eval.agent_type`` injected as resource attributes so the viewer can
-       display them without a separate ``import-harbor`` step.
-    3. If unreachable → fall back to JSONL files in the Harbor artifact
-       directory (``/logs/artifacts/traces/``), importable later via
-       ``nemo-oo import-harbor``.
+    JSONL files under ``/logs/agent/traces/`` (a host-mounted directory)
+    are written unconditionally — they are the record failure analysis runs on,
+    and they are importable later via ``nemo-oo import-harbor``.  When
+    ``OTLP_ENDPOINT`` (default ``http://localhost:5001``) is reachable the
+    journal exporter is added *alongside* the file exporter so the viewer sees
+    spans live without that becoming the only copy.
+
+    Streaming used to replace the file exporter rather than supplement it, so a
+    run against a reachable viewer left no trajectory on disk at all.
 
     Note: Apptainer containers share the host network namespace, so
     ``localhost:5001`` inside the container resolves to the developer's host.
@@ -85,17 +91,20 @@ def _setup_tracing(model: str, agent_type: str) -> None:
 
     endpoint = os.environ.get("OTLP_ENDPOINT", "http://localhost:5001/v1/traces")
 
+    TRACES_DIR.mkdir(parents=True, exist_ok=True)
+    exporters = [nemo_exporters.jsonl(TRACES_DIR)]
+
     if probe_otlp_endpoint(endpoint):
-        logger.info("OTLP endpoint reachable (%s) — streaming traces live", endpoint)
-        enable_tracing(
-            exporters=[nemo_exporters.journal(endpoint=endpoint)],
-            extra_resource_attrs={"eval.model": model, "eval.agent_type": agent_type},
-        )
-        logger.info("OTel tracing enabled → %s", endpoint)
+        exporters.append(nemo_exporters.journal(endpoint=endpoint))
+        logger.info("OTLP endpoint reachable (%s) — also streaming live", endpoint)
     else:
-        TRACES_DIR.mkdir(parents=True, exist_ok=True)
-        enable_tracing(exporters=[nemo_exporters.jsonl(TRACES_DIR)])
-        logger.info("OTel tracing enabled → %s (OTLP not reachable)", TRACES_DIR)
+        logger.info("OTLP endpoint unreachable (%s) — writing files only", endpoint)
+
+    enable_tracing(
+        exporters=exporters,
+        extra_resource_attrs={"eval.model": model, "eval.agent_type": agent_type},
+    )
+    logger.info("OTel tracing enabled → %s (%d exporter(s))", TRACES_DIR, len(exporters))
 
 
 def _import_agent_class(agent_type: str) -> type:
@@ -126,6 +135,42 @@ def _write_result(result: dict[str, Any], model: str, agent_type: str) -> None:
     out = LOGS_DIR / "result.json"
     out.write_text(json.dumps(payload, indent=2))
     logger.info("Result written → %s", out)
+
+
+def _write_trajectory(agent: Any) -> None:
+    """Dump the agent's full event history to LOGS_DIR/trajectory.json.
+
+    The OTLP spans under ``agent/traces/`` remain the canonical record, but
+    failure analysis starts in the per-task ``agent/`` directory — which
+    otherwise holds only ``nooa_bench.log`` and a ``result.json`` carrying just
+    the final response.  Anyone looking there for the turn-by-turn trajectory
+    previously found nothing.
+    """
+    manager = getattr(agent, "event_manager", None)
+    if manager is None:
+        logger.warning("Agent exposes no event_manager — no trajectory written")
+        return
+
+    try:
+        events = [
+            {
+                "event_id": event_id,
+                "event_type": type(event).__name__,
+                **event.model_dump(mode="json"),
+            }
+            for event_id, event in manager.items()
+        ]
+    except Exception as e:  # never fail the task over a debug artifact
+        logger.warning("Could not serialise trajectory: %s", e)
+        return
+
+    out = LOGS_DIR / "trajectory.json"
+    try:
+        out.write_text(json.dumps(events, indent=2, default=str))
+    except OSError as e:
+        logger.warning("Could not write %s: %s", out, e)
+        return
+    logger.info("Trajectory written → %s (%d events)", out, len(events))
 
 
 def _write_answer(result: dict[str, Any]) -> None:
@@ -180,6 +225,7 @@ async def _run(
     result = await agent._run_evaluation(task_input)
     result.update(get_task_tokens())
     _write_result(result, model, agent_type)
+    _write_trajectory(agent)
     _write_answer(result)
 
     if result.get("success"):

@@ -9,7 +9,10 @@ Usage:
     nooa completion install         # Set up shell completions
 
 Adding new commands:
-    Drop a .py file in nooa_cli/commands/ — see commands/_template.py
+    In this package: drop a .py file in nooa_cli/commands/ — see
+    commands/_template.py
+    From another package: register an entry point in the
+    "nooa_cli.commands" group — see nooa_cli/commands/__init__.py
 
 Shell completion:
     eval "$(_NOOA_COMPLETE=bash_source nooa)"    # bash
@@ -36,7 +39,8 @@ def oo(ctx):
     """OO Agents — agent toolkit.
 
     Extensible CLI for running agents, evaluations, and trace management.
-    Add new commands by dropping a .py file in nooa_cli/commands/.
+    Add new commands by dropping a .py file in nooa_cli/commands/, or from
+    another package via the "nooa_cli.commands" entry-point group.
     """
     if ctx.invoked_subcommand in _SKIP_SECRETS_PRELOAD:
         return
@@ -57,11 +61,14 @@ def oo(ctx):
         )
 
 
-# -- Auto-discover and register all commands from commands/ -----------------
+# -- Auto-discover and register all commands (built-ins + entry-point plugins) --
 for _name, _cmd in discover_commands():
     oo.add_command(_cmd, name=_name)
 
 # -- Built-in infrastructure commands (not in commands/ because they're meta) -
+# Registered *after* discovery on purpose: `completion` is not part of
+# discover_commands(), so this ordering is what stops a third-party plugin
+# named "completion" from taking the name.
 oo.add_command(completion)
 
 

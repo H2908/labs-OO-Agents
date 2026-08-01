@@ -12,6 +12,15 @@ authors = [
     {name = "NVIDIA NeMo Team"}
 ]
 requires-python = ">=3.12,<3.14"
+keywords = ["agents", "llm", "codeact", "event-sourcing", "orchestration", "nemo"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "pydantic>=2.5.0",
     # context_blocks + unifiedllm now ship as nooa.context_blocks /
@@ -23,6 +32,12 @@ dependencies = [
     "httpx>=0.27.0",
     "openinference-instrumentation-litellm>=0.1.30",
 ]
+
+[project.urls]
+Homepage = "https://github.com/NVIDIA-NeMo/labs-OO-Agents"
+Repository = "https://github.com/NVIDIA-NeMo/labs-OO-Agents"
+Changelog = "https://github.com/NVIDIA-NeMo/labs-OO-Agents/blob/main/CHANGELOG.md"
+Issues = "https://github.com/NVIDIA-NeMo/labs-OO-Agents/issues"
 
 [project.scripts]
 trace-explorer = "nooa.trace_explorer:main"
@@ -46,7 +61,7 @@ nooa-bench = { workspace = true }
 [tool.uv]
 # Extra index URLs to search for packages (in addition to PyPI)
 # Ignore packages uploaded less than 7 days ago to mitigate supply-chain attacks
-exclude-newer = "2026-07-03T00:00:00Z"
+exclude-newer = "2026-07-23T00:00:00Z"
 # Match the package's supported Python range and LiteLLM's stable releases.
 environments = [
     "python_full_version >= '3.12' and python_full_version < '3.14'",
@@ -62,6 +77,18 @@ members = [
 
 
 [project.optional-dependencies]
+# Convenience aliases for the sibling distributions, so `pip install
+# nooa[cli]` does what a user reasonably expects. Without these, that command
+# *succeeds* with only a warning and silently installs no CLI.
+#
+# These are deliberately circular (nooa[cli] -> nooa-cli -> nooa); pip and uv
+# both resolve that fine, and it is the standard pattern for a split
+# core/plugin distribution. No version floor, matching the existing policy in
+# packages/*/pyproject.toml: published wheels declare what they actually need
+# rather than being locked to their co-released version.
+cli = ["nooa-cli"]
+memory = ["nooa-memory"]
+bench = ["nooa-bench"]
 # ARC-AGI-3 example agent (examples/arc_agi_3): the public ARC-AGI-3 SDK + deps.
 # Install with `pip install "nemo-oo-agents[arc]"` (or `uv sync --extra arc`).
 arc = [
@@ -93,11 +120,22 @@ sandbox = [
 mcp = [
     "mcp>=1.0.0",
 ]
-# NeMo Flow integration (guardrails, intercepts, event subscribers, ATIF
-# export). The upstream package was renamed from nemo-flow to nemo-relay.
-# See src/nooa/nemo_flow_middleware.py and examples/quickstart/15_nemo_relay.py.
+# NeMo Relay integration (guardrails, intercepts, event subscribers, ATIF
+# export).
+# See src/nooa/nemo_relay_middleware.py and examples/quickstart/15_nemo_relay.py.
+#
+# Floor is 0.6: LLM request intercepts must return `LLMRequestInterceptOutcome`
+# (0.5+) rather than a `(request, annotated)` tuple, and that type does not
+# exist in 0.4 — so there is no single callback shape that spans 0.4 and 0.6.
+#
+# Ceiling is <0.7: 0.7 changes the LLM sanitizer contract to the two-argument
+# form `(payload, directional_context) -> payload | None` with no compatibility
+# shim, and makes an implicit `return` mean "omit the payload" (fail-closed).
+# Our library code (nemo_relay_middleware.py) registers no sanitizers and is
+# unaffected, but tests/test_nemo_relay_middleware.py does — see the sanitizer
+# registrations there before lifting this bound.
 nemo-relay = [
-    "nemo-relay>=0.4.0",
+    "nemo-relay>=0.6,<0.7",
 ]
 
 # CLI ships as a separate package: `uv add nooa-cli`.
@@ -175,8 +213,7 @@ testpaths = [
     "tests/unifiedllm",
     "tests/tracing",
     "tests/test_mcp",
-    "packages/nooa-cli/tests/cli",
-    "packages/nooa-cli/tests/integration",
+    "packages/nooa-cli/tests",
     "packages/nooa-bench/tests",
     "tests/trace_explorer",
 ]

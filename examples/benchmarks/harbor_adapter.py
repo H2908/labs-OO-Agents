@@ -51,7 +51,7 @@ class NooaBenchAgent(BaseInstalledAgent):
 
     YAML kwargs:
         git_url:    clone URL of the NOOA repo (or env ``NOOA_GIT_URL``)
-        git_ref:    optional branch/tag/SHA (or env ``NOOA_GIT_REF``)
+        git_ref:    optional branch/tag/full commit SHA (or env ``NOOA_GIT_REF``)
         agent_type: registry key passed to ``nemo-harbor`` (default ``bench``)
         api_base:   optional OpenAI-compatible endpoint override
     """
@@ -83,14 +83,25 @@ class NooaBenchAgent(BaseInstalledAgent):
 
     async def install(self, environment: BaseEnvironment) -> None:
         """Clone the repo and install core + cli + bench into a fresh venv."""
-        branch = f"--branch {shlex.quote(self._git_ref)} " if self._git_ref else ""
+        url = shlex.quote(self._git_url)
+        if self._git_ref:
+            # `git clone --branch` rejects commit SHAs; fetching the ref and
+            # checking out FETCH_HEAD handles branches, tags, and full SHAs alike.
+            clone = (
+                f"mkdir -p {REPO_DIR} && cd {REPO_DIR} && git init -q && "
+                f"git remote add origin {url} && "
+                f"git fetch -q --depth 1 origin {shlex.quote(self._git_ref)} && "
+                "git checkout -q FETCH_HEAD"
+            )
+        else:
+            clone = f"git clone --depth 1 {url} {REPO_DIR}"
         await self.exec_as_root(
             environment,
             command=(
                 # git may be missing from slim task images; best-effort install.
                 "(which git > /dev/null 2>&1 || "
                 "(apt-get update && apt-get install -y git curl)) && "
-                f"git clone --depth 1 {branch}{shlex.quote(self._git_url)} {REPO_DIR} && "
+                f"{clone} && "
                 # uv gives us a venv + resolver without assuming pip exists.
                 "(which uv > /dev/null 2>&1 || "
                 "(curl -LsSf https://astral.sh/uv/install.sh | sh)) && "
