@@ -29,12 +29,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from nooa.unifiedllm import UnifiedLLM
-
-    # A concrete client, or a callable resolving one from the agent instance.
-    MethodLLM = UnifiedLLM | Callable[[Any], UnifiedLLM]
 
 
 def _is_llm_client(spec: Any) -> bool:

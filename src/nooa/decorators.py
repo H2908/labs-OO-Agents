@@ -15,8 +15,8 @@ from nooa.ellipsis_detection import has_ellipsis_body
 
 if TYPE_CHECKING:
     from nooa.config.truncation_config import TruncationConfig
-    from nooa.method_llm import MethodLLM
     from nooa.strategies import GenerationStrategy as GenerationStrategyABC
+    from nooa.unifiedllm import UnifiedLLM
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -26,7 +26,7 @@ def strategy(
     strategy_instance: "GenerationStrategyABC | None" = None,
     context: "ScopedContext | dict[str, Any] | None" = None,
     *,
-    llm: "MethodLLM | None" = None,
+    llm: "UnifiedLLM | Callable[[Any], UnifiedLLM] | None" = None,
     truncation: "TruncationConfig | None" = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Strategy decorator for agent methods.
