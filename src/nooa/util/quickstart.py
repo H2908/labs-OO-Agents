@@ -26,10 +26,18 @@ load_dotenv(override=True)
 #   * OPENAI_API_KEY           -> OpenAI (public)
 #   * NVIDIA_INFERENCE_API_KEY -> NVIDIA internal inference gateway
 #                                 (inference-api.nvidia.com; NVIDIA employees)
-# To use a specific model, set MODEL to any litellm name and provide its key,
-# e.g. MODEL = "claude-haiku-4-5" with ANTHROPIC_API_KEY.
+# To pin a specific model, set NEMO_OO_MODEL to any litellm name and provide its
+# credential, e.g. NEMO_OO_MODEL="claude-haiku-4-5" with ANTHROPIC_API_KEY.
+# For a local server, add NEMO_OO_API_BASE, e.g.
+#   NEMO_OO_MODEL="ollama_chat/qwen3:1.7b" NEMO_OO_API_BASE="http://localhost:11434"
 _internal_key = os.getenv("NVIDIA_INFERENCE_API_KEY") or os.getenv("NVIDIA_INTERNAL_API_KEY")
-if os.getenv("NVIDIA_API_KEY"):
+if os.getenv("NEMO_OO_MODEL"):
+    # Checked first so a local model does not require unsetting provider keys.
+    # api_base is only passed when set, so hosted providers route normally.
+    MODEL = os.environ["NEMO_OO_MODEL"]
+    _api_base = os.getenv("NEMO_OO_API_BASE")
+    llm = get_llm_client(MODEL, **({"api_base": _api_base} if _api_base else {}))
+elif os.getenv("NVIDIA_API_KEY"):
     # build.nvidia.com NIM. litellm routes `nvidia_nim/*` to
     # integrate.api.nvidia.com; it reads the key from NVIDIA_NIM_API_KEY, so
     # pass NVIDIA_API_KEY (the build.nvidia.com convention) explicitly.

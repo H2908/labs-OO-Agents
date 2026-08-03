@@ -53,7 +53,18 @@ from nooa.unifiedllm import get_llm_client
 llm = get_llm_client("gpt-4o-mini")                 # OpenAI (needs OPENAI_API_KEY)
 llm = get_llm_client("claude-sonnet-4-5-20250514")  # Anthropic (needs ANTHROPIC_API_KEY)
 llm = get_llm_client("gemini/gemini-2.5-flash")     # Google (needs GEMINI_API_KEY)
+llm = get_llm_client("ollama_chat/qwen3:1.7b",      # Ollama (no key)
+                     api_base="http://localhost:11434")
 ```
+
+The checked-in examples take their model from the environment. Set `NEMO_OO_MODEL` to any litellm name, plus `NEMO_OO_API_BASE` for a local server:
+
+```bash
+NEMO_OO_MODEL="ollama_chat/qwen3:1.7b" NEMO_OO_API_BASE="http://localhost:11434" \
+  uv run python examples/quickstart/01_first_generation_method.py
+```
+
+Without it, the examples select whichever provider credential is present (`NVIDIA_API_KEY`, `OPENAI_API_KEY`, ...).
 
 Provider packages can register bundled model aliases automatically through the `nooa.bundled_configs` entry-point group. To customize the registry, run `nooa config eject`, drop an `llm_config.yaml` in your project's `.nooa/`, or point `NEMO_OO_LLM_CONFIG` at one or more YAML files. See [`src/nooa/unifiedllm/registry.py`](../src/nooa/unifiedllm/registry.py) for the YAML schema.
 
