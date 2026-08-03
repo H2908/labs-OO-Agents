@@ -557,6 +557,22 @@ class MyAgent(Agent, llm=default_llm):              # 1. class default
         ...
 
 agent = MyAgent(llm=different_llm)                  # 4. instance override
+await agent.complex_task(llm=one_off_llm)           # 5. call override
+```
+
+A method override can also be a callable taking the agent and returning a
+client. It is resolved on each call, so the per-method model can be chosen at
+agent-construction time (or vary with instance state) instead of being fixed
+when the module is imported:
+
+```python
+class MyAgent(Agent, llm=default_llm):
+    @strategy(CodeActStrategy(), llm=lambda self: self.big_model)
+    async def complex_task(self) -> str:
+        ...
+
+alice = MyAgent(); alice.big_model = strong_llm     # same method, different
+bob = MyAgent();   bob.big_model = cheap_llm        # model per instance
 ```
 
 ### Event-driven history

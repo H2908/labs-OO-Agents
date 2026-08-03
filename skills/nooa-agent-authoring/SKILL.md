@@ -58,10 +58,31 @@ Keys come from `.env` (library use) or `~/.config/nooa/secrets.yaml`.
 
 **Resolution cascade** for which LLM a method uses — first match wins:
 
-1. `@strategy(..., llm=special_llm)` — method override
-2. `agent = MyAgent(llm=other)` — instance override
-3. `class MyAgent(Agent, llm=default)` — class default
-4. **Parent inheritance** — a subagent with no `llm=` of its own inherits from the agent that calls it
+1. `await agent.method(..., llm=special_llm)` — call override
+2. `@strategy(..., llm=special_llm)` — method override
+3. `agent = MyAgent(llm=other)` — instance override
+4. `class MyAgent(Agent, llm=default)` — class default
+5. **Parent inheritance** — a subagent with no `llm=` of its own inherits from the agent that calls it
+
+The method override also accepts a **callable** taking the agent and returning
+a client, resolved on each call. Use it when the per-method model has to be
+chosen per instance (or per call) rather than fixed at import time:
+
+```python
+class Researcher(Agent, llm=fast):
+    def __init__(self, big, **kw):
+        super().__init__(**kw)
+        self.big = big
+
+    @strategy(llm=lambda self: self.big)          # differs per instance
+    async def analyze(self, doc: str) -> str: ...
+
+    @strategy(llm=lambda self: self.big if self.retries > 2 else fast)
+    async def solve(self, problem: str) -> str: ...   # differs per call
+```
+
+Standalone `@strategy` functions must pass a client, not a callable — they
+have no instance to resolve against.
 
 Child agents inherit the parent's LLM by default. Any explicit `llm=` on the child overrides it — that's how you run a cheap model for one phase:
 

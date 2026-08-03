@@ -2557,9 +2557,19 @@ class ActorRuntime:
 
         strategy = call_strategy or decorator_strategy or get_default_strategy()
 
-        # Resolve LLM client with priority: call-level > @strategy decorator > agent's default
-        plan_llm = getattr(base_method, "_plan_llm", None)
-        llm_client = call_llm or plan_llm or getattr(self.agent, "_llm", None)
+        # Resolve LLM client with priority: call-level > @strategy decorator > agent's default.
+        # A @strategy(llm=...) value may be a callable resolved against the agent
+        # instance; only invoke it when it would actually be used, so a call-level
+        # override doesn't trigger someone else's resolver side effects.
+        if call_llm is not None:
+            llm_client = call_llm
+        else:
+            plan_llm = getattr(base_method, "_plan_llm", None)
+            if plan_llm is not None:
+                from nooa.method_llm import resolve_method_llm
+
+                plan_llm = resolve_method_llm(plan_llm, self.agent, method_name)
+            llm_client = plan_llm or getattr(self.agent, "_llm", None)
         if llm_client is None:
             raise RuntimeError(f"No LLM client available for {method_name}")
 

@@ -115,14 +115,26 @@ def create_agent_method_wrapper(
                 _tc = DEFAULT_TRUNCATION_CONFIG
 
             # Strip framework kwargs before validation — they're consumed by
-            # _execute_with_generation, not the user's method signature.
-            _fw_session_locals = kwargs.pop("_session_locals", None)
+            # _execute_with_generation, not the user's method signature. Must
+            # cover every name that _execute_with_generation pops, or the call
+            # is rejected here before it can ever get there.
+            #
+            # Only on the agent path: the strategy-helper path below routes to
+            # execute_nested(), which pops nothing, so stripping there would
+            # drop these names silently into CurrentCall's prompt arguments
+            # instead of rejecting them as the unexpected kwargs they are.
+            _fw_kwargs: dict[str, Any] = {}
+            if hasattr(self, "runtime"):
+                _fw_kwargs = {
+                    _name: kwargs.pop(_name)
+                    for _name in ("_session_locals", "_strategy", "llm")
+                    if _name in kwargs
+                }
             try:
                 ArgumentValidator().validate(original_func, args, kwargs, _tc)
             finally:
                 # Restore so _execute_with_generation can pop them
-                if _fw_session_locals is not None:
-                    kwargs["_session_locals"] = _fw_session_locals
+                kwargs.update(_fw_kwargs)
 
             # Strategy resolution if not provided
             if resolved_strategy is None:
