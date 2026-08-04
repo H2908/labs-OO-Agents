@@ -27,7 +27,7 @@ from nooa.runtime.sandbox.guards import (
     probe_capabilities,
 )
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.sandbox
 
 CAPS = probe_capabilities()
 

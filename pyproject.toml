@@ -221,11 +221,12 @@ pythonpath = [
     "src",
     "packages/nooa-cli/src",
 ]
-addopts = "-v --tb=short --import-mode=importlib -m 'not integration and not stress'"
+addopts = "-v --tb=short --import-mode=importlib -m 'not integration and not stress and not sandbox'"
 markers = [
     "integration: marks tests as integration tests that make real API calls (run with '-m integration')",
     "provider_compat_ollama: marks live Ollama provider compatibility tests",
     "provider_compat_vllm: marks live vLLM provider compatibility tests",
+    "sandbox: marks tests that fork a real sandbox worker to exercise OS-level containment (run with '-m sandbox'); no credentials needed, but heavier than unit tests",
     "stress: marks tests as stress/load tests that simulate high concurrency (run with '-m stress')",
 ]
 filterwarnings = [
