@@ -12,23 +12,34 @@ from __future__ import annotations
 
 import os
 import shutil
-import warnings
 
 import pytest
 
 
-def pytest_sessionstart(session: pytest.Session) -> None:
-    missing = [tool for tool in ("rg", "grep") if shutil.which(tool) is None]
-    if not missing:
-        return
-    msg = (
+def _missing_prereqs() -> list[str]:
+    return [tool for tool in ("rg", "grep") if shutil.which(tool) is None]
+
+
+def _prereq_message(missing: list[str]) -> str:
+    return (
         f"tests/tools/ prerequisite missing on PATH: {', '.join(missing)}. "
         "Install ripgrep (`apt install ripgrep` / `brew install ripgrep`); "
         "see tests/README.md."
     )
-    # CI must fail loud rather than silently skip 145 tests. Locally, warn
-    # but do not block — a contributor running `pytest tests/agents/` should
-    # not be forced to install a dep for a suite they are not touching.
-    if os.environ.get("CI"):
-        pytest.exit(msg, returncode=1)
-    warnings.warn(msg, UserWarning, stacklevel=1)
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    # CI must fail loud rather than silently skip 145 tests. Locally, the
+    # header hook below surfaces a banner but the run continues — a
+    # contributor running `pytest tests/agents/` should not be forced to
+    # install a dep for a suite they are not touching.
+    missing = _missing_prereqs()
+    if missing and os.environ.get("CI"):
+        pytest.exit(_prereq_message(missing), returncode=1)
+
+
+def pytest_report_header(config: pytest.Config) -> str | None:
+    missing = _missing_prereqs()
+    if not missing:
+        return None
+    return f"WARNING: {_prereq_message(missing)}"
