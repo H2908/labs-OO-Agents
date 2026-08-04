@@ -22,7 +22,7 @@ from nooa.runtime.sandbox.guards import probe_capabilities
 from nooa.strategies.codeact import CodeActStrategy
 from nooa.unifiedllm import FakeLLMClient, LLMResponse, ToolCall
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.sandbox
 
 CAPS = probe_capabilities()
 

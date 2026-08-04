@@ -124,7 +124,7 @@ def _executor() -> SandboxedExecutor:
     )
 
 
-@pytest.mark.integration
+@pytest.mark.sandbox
 @pytest.mark.asyncio
 async def test_cell_mutating_module_dict_fails_loud():
     ex = _executor()
@@ -137,7 +137,7 @@ async def test_cell_mutating_module_dict_fails_loud():
         await ex.aclose()
 
 
-@pytest.mark.integration
+@pytest.mark.sandbox
 @pytest.mark.asyncio
 async def test_cell_mutating_module_list_fails_loud():
     ex = _executor()
@@ -148,7 +148,7 @@ async def test_cell_mutating_module_list_fails_loud():
         await ex.aclose()
 
 
-@pytest.mark.integration
+@pytest.mark.sandbox
 @pytest.mark.asyncio
 async def test_cell_reading_module_state_still_works():
     ex = _executor()

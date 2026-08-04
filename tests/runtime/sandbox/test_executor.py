@@ -22,7 +22,7 @@ from nooa.runtime.sandbox.executor import SandboxedExecutor
 from nooa.runtime.sandbox.guards import probe_capabilities
 from nooa.unifiedllm.fake import FakeLLMClient
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.sandbox
 
 CAPS = probe_capabilities()
 

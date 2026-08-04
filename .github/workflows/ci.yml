@@ -35,7 +35,15 @@ jobs:
       - name: Sync
         run: uv sync --all-extras --no-extra sandbox
       - name: Unit tests (no live API calls)
-        run: uv run pytest -q -m "not integration and not stress"
+        run: uv run pytest -q -m "not integration and not stress and not sandbox"
+      # Sandbox containment tests fork a real worker to exercise the OS-level
+      # sandbox (Landlock, seccomp, RLIMIT, cell timeouts, broker-pipe
+      # boundary). They need no credentials and skipif-degrade on kernels
+      # without the relevant capabilities, so ubuntu-latest runs them for
+      # real. Kept out of the unit-test step because forking a worker is
+      # heavier than a unit test. See #78.
+      - name: Sandbox containment tests
+        run: uv run pytest -q -m sandbox
 
   build:
     runs-on: ubuntu-latest
