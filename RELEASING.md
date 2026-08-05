@@ -1,153 +1,76 @@
 # Releasing
 
-Four workspace packages release together from the same git commit:
-
-- **`nooa`** — the core framework
-- **`nooa-cli`** — the `nooa` command and REPL
-- **`nooa-memory`** — the long-term memory subsystem
-- **`nooa-bench`** — the benchmark agent and Harbor runner
-
-The version is derived from the git **tag** at build time by
-[`uv-dynamic-versioning`](https://github.com/ninoseki/uv-dynamic-versioning).
-There is no `version = "..."` in any `pyproject.toml` and no manual bump step.
-**Tagging the commit is the release ceremony.**
-
-## Versioning
-
-The version comes from the last `vX.Y.Z` tag reachable from the commit, plus
-the distance to that tag:
-
-| Repo state | Version |
-|---|---|
-| Exactly on tag `v0.0.6` | `0.0.6` |
-| 5 commits past `v0.0.6` | `0.0.7.dev5` |
-| No `vX.Y.Z` tag reachable yet | `0.0.1.dev<distance>` |
-
-> `fallback-version = "0.0.6"` in `pyproject.toml` is used **only** when git
-> is unavailable (e.g. building from an unpacked sdist with no `.git/`).
-> Whenever git is present, the version is derived from `git describe`.
-
-This is a `0.x` **research preview** — the public API is not yet stable and may
-change between releases (per [SemVer](https://semver.org/), `0.y.z` signals
-initial development).
+`nooa`, `nooa-cli`, `nooa-memory` and `nooa-bench` release together from the
+same commit. **The version comes from the git tag** — there is no `version =`
+in any `pyproject.toml` and no bump step. On tag `v0.0.9` the wheels are
+`0.0.9`; between tags they are `0.0.9.devN`.
 
 ## Cutting a release
 
-Publishing to PyPI is automated by
-[`.github/workflows/publish.yml`](.github/workflows/publish.yml). **Publishing a
-GitHub Release is the release ceremony** — the release's tag is what
-`uv-dynamic-versioning` turns into the version.
-
 ```bash
 git checkout main && git pull
-gh release create v0.0.7 --title "NOOA 0.0.7" --generate-notes --draft
-# review the draft notes, then publish it:
-gh release edit v0.0.7 --draft=false
+uv run python scripts/make_release.py v0.0.9
 ```
 
-Publishing the release triggers the workflow, which:
+The script runs everything in order and stops at two prompts — after the
+capability report, and after the draft notes:
 
-1. Builds all four packages from the tagged commit.
-2. Fails the run if the built version does not match the tag, or is a `.devN`
-   version (which means the tag was not reachable from the checked-out commit).
-3. Smoke-tests the wheels in a clean venv (imports + `nooa --version`).
-4. Uploads to PyPI via **Trusted Publishing** (`uv publish`) — no API tokens.
-5. Attaches the wheels and sdists to the GitHub Release.
+| Step | Fails the run? |
+|---|---|
+| Preflight — on `main`, clean, in sync with origin, tag unused | yes |
+| Lint, SPDX headers, unit tests | yes |
+| Build 4 wheels, version == tag, smoke import | yes |
+| Capability diff vs the previous release, 4 models × 3 runs | only below the floor |
+| `gh release create --draft`, capability report appended | — |
+| `gh release edit --draft=false` → triggers `publish.yml` | — |
 
-Each upload waits on its `pypi-<package>` GitHub Environment, so a required
-reviewer there gives a second pair of eyes before the irreversible step.
+Publishing uploads to PyPI via Trusted Publishing. Each package waits on its
+`pypi-<package>` GitHub Environment, so a reviewer approves before upload.
 
-> **Why no third-party actions.** Every `uses:` in `publish.yml` is an
-> `actions/*` action. This org enforces a GitHub Actions allowlist, and a
-> disallowed action fails the *entire workflow* at startup — that is what left
-> CI dead for eight days (PR #50). A publish workflow that cannot start is one
-> that silently never ships, so uv is installed from a pinned install script
-> and does the upload itself.
->
-> The tradeoff is **no PEP 740 attestations**: `uv publish` uploads them but
-> [does not generate them](https://docs.astral.sh/uv/guides/package/), and the
-> action that does (`pypa/gh-action-pypi-publish`) may not be allowlisted.
-> Worth revisiting if it is added to the allowlist, or once uv can generate
-> them. Trusted Publishing itself is unaffected.
+### Capability gate
 
-### Dry run against TestPyPI
+Both arms run fresh: HEAD in the working tree, the previous tag in a temporary
+worktree. Comparing against a stored baseline cannot tell a real regression
+from the endpoint behind a model alias changing.
 
-Run the **Publish** workflow manually (Actions → Publish → Run workflow). This
-exercises the identical build, version check, and smoke test.
+The only hard threshold is a **floor** on the stable tier (60%) — clearing it
+requires typing `OVERRIDE`. Everything else (collapses, new error types, drops
+beyond ±5 points) is reported for a human to judge. An arm where >50% of
+samples error is rejected as infrastructure failure rather than reported as a
+result. Results cache under `tmp/release-check/`, so aborting at a prompt does
+not mean paying for another run.
 
-A manual run always targets TestPyPI — there is no index selector. Real PyPI is
-reachable only by publishing a GitHub Release, so a mis-click here cannot burn
-a version number on PyPI.
+### Flags
 
-### Doing it by hand
+| Flag | Use |
+|---|---|
+| `--checks-only` | run everything, print the report, touch nothing |
+| `--dry-run` | print the `gh` commands instead of running them |
+| `--skip-capability` | docs-only releases |
+| `--models` / `--runs` / `--limit` | cheap rehearsal; requires `--checks-only` |
 
-`--no-sources` disables `tool.uv.sources` so the build is exercised the way a
-non-uv consumer sees it — the [uv packaging
-guide](https://docs.astral.sh/uv/guides/package/) recommends it for release
-builds.
+Rehearse without spending real money:
 
 ```bash
-rm -rf dist
-for p in nooa nooa-cli nooa-memory nooa-bench; do
-  uv build --no-sources --package "$p" --out-dir dist
-done
-uvx twine check dist/*
-uv venv /tmp/nooa-smoke --python 3.12
-VIRTUAL_ENV=/tmp/nooa-smoke uv pip install dist/nooa-*.whl dist/nooa_cli-*.whl \
-  dist/nooa_memory-*.whl dist/nooa_bench-*.whl
-/tmp/nooa-smoke/bin/python -c "import nooa, nooa_cli, nooa_memory, nooa_bench; print(nooa.__version__)"
+uv run python scripts/make_release.py v0.0.9 --checks-only \
+  --models claude-haiku --runs 1 --limit 1
 ```
 
-### Pre-release tags
-
-Annotated tags like `v0.0.6-rc1` build as `0.0.6rc1` (PEP 440 normalized). Mark
-the GitHub Release as a pre-release; PyPI will not serve it to plain
-`pip install nooa`.
+Report logic is covered by `tests/test_make_release.py`.
 
 ## One-time PyPI setup
 
-Each of the four project names needs a **pending publisher** registered at
-<https://pypi.org/manage/account/publishing/> before its first upload. Owner
-`NVIDIA-NeMo`, repository `labs-OO-Agents`, workflow `publish.yml` for all four
-— but the **environment name differs per package**:
+Each project needs a pending publisher at
+<https://pypi.org/manage/account/publishing/> — owner `NVIDIA-NeMo`, repo
+`labs-OO-Agents`, workflow `publish.yml`, and a **distinct environment per
+package**: `pypi-nooa`, `pypi-nooa-cli`, `pypi-nooa-memory`, `pypi-nooa-bench`.
+PyPI keys a pending publisher on (owner, repo, workflow, environment), so a
+shared environment makes the second registration fail. The matching GitHub
+Environments must exist too.
 
-| PyPI Project Name | Environment name |
-|---|---|
-| `nooa` | `pypi-nooa` |
-| `nooa-cli` | `pypi-nooa-cli` |
-| `nooa-memory` | `pypi-nooa-memory` |
-| `nooa-bench` | `pypi-nooa-bench` |
+Repeat on <https://test.pypi.org> with `testpypi-<package>` names. Running the
+**Publish** workflow manually always targets TestPyPI.
 
-> **Why one environment per package.** PyPI keys a *pending* publisher on
-> (owner, repo, workflow filename, environment). If all four shared one
-> environment, the second registration fails with *"a pending trusted publisher
-> matching this configuration has already been registered for a different
-> project name"* — PyPI cannot tell which project to create on first upload.
-> The restriction lifts once a project exists, but the per-package environment
-> is kept because it also gives per-package approval gates.
-
-Repeat on <https://test.pypi.org> using `testpypi-<package>` environment names
-for dry runs. After the first successful upload each pending publisher becomes
-a normal one.
-
-The matching **GitHub Environments** must exist too (Settings → Environments):
-`pypi-nooa`, `pypi-nooa-cli`, `pypi-nooa-memory`, `pypi-nooa-bench`, and the
-four `testpypi-*` equivalents.
-
-## Distribution
-
-```bash
-uv add nooa nooa-cli
-```
-
-Installing straight from a tag also works, and does not require a release:
-
-```bash
-uv add "nooa @ git+https://github.com/NVIDIA-NeMo/labs-OO-Agents.git@v0.0.7"
-```
-
-## Cross-package dependencies
-
-`nooa-cli`, `nooa-memory`, and `nooa-bench` depend on the core `nooa` package.
-They are always released together at the same derived version, so their
-dependency on `nooa` carries **no version floor** — CI never rewrites it.
+> Every `uses:` in `publish.yml` must be an `actions/*` action. This org
+> enforces an allowlist, and a disallowed action fails the whole workflow at
+> startup — that is what left CI dead for eight days (PR #50).

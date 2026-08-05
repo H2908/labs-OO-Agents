@@ -35,6 +35,11 @@ SKIP_DIRS = {
     "site-packages",
     ".scratch",
     "htmlcov",
+    # Local git worktrees are separate checkouts of other branches. Scanning
+    # them makes this check fail on someone else's in-progress work — and on
+    # vendored trees that branch happens to contain. CI never has them, so the
+    # failure only ever hits developers running the check locally.
+    ".worktrees",
 }
 
 
