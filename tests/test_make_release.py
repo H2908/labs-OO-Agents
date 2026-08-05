@@ -181,7 +181,8 @@ def test_floor_passes_just_above_the_line(mr, tmp_path):
     assert diff.floor_breach is None
 
 
-def test_new_and_removed_tests_are_listed_not_compared(mr, tmp_path):
+def test_added_tests_are_listed_but_do_not_block(mr, tmp_path):
+    """A new test has no baseline to regress from, so it must not fail the run."""
     base_rows = all_passing()
     head_rows = all_passing() + [
         ("claude-haiku", "brand_new", "brand_new_001", "stable", True, None)
@@ -193,6 +194,42 @@ def test_new_and_removed_tests_are_listed_not_compared(mr, tmp_path):
     assert diff.added == ["claude-haiku/brand_new"]
     assert diff.removed == []
     assert "*(new)*" in diff.markdown
+    assert diff.clean
+
+
+def test_removed_test_is_not_clean(mr, tmp_path):
+    """Deleting or renaming a failing test must not erase the regression.
+
+    Without this, dropping a test that fails on HEAD leaves the verdict at
+    "no regressions" and `--checks-only` exiting 0, while testing less.
+    """
+    head_rows = [
+        row for row in all_passing() if row[1] != "router_multi"
+    ]  # router_multi deleted on HEAD
+    base = mr.parse_results(write_eval(tmp_path / "b.jsonl", all_passing()), "v0.0.8")
+    head = mr.parse_results(write_eval(tmp_path / "h.jsonl", head_rows), "head")
+    diff = mr.compare(base, head, "v0.0.8", "abc123456789")
+
+    assert sorted(diff.removed) == ["claude-haiku/router_multi", "gpt-5.4-mini/router_multi"]
+    assert not diff.clean, "a disappearing test must not report as clean"
+    assert "removed test(s)" in diff.markdown
+
+
+def test_model_set_change_is_not_reported_as_removed_tests(mr, tmp_path):
+    """Changing GATE_MODELS must not look like the suite being deleted.
+
+    Every test of a model that ran in only one arm would otherwise land in
+    added/removed, and gating on `removed` would block every model-set change.
+    """
+    head_rows = [row for row in all_passing() if row[0] == "claude-haiku"]
+    base = mr.parse_results(write_eval(tmp_path / "b.jsonl", all_passing()), "v0.0.8")
+    head = mr.parse_results(write_eval(tmp_path / "h.jsonl", head_rows), "head")
+    diff = mr.compare(base, head, "v0.0.8", "abc123456789")
+
+    assert diff.models_changed == ["gpt-5.4-mini"]
+    assert diff.removed == [], "a dropped model is not a dropped test"
+    assert diff.added == []
+    assert diff.clean
 
 
 def test_progress_bar_encodes_gain_and_loss(mr):

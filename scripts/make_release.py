@@ -547,12 +547,21 @@ class Diff:
     beyond_noise: list[str] = field(default_factory=list)
     added: list[str] = field(default_factory=list)
     removed: list[str] = field(default_factory=list)
+    models_changed: list[str] = field(default_factory=list)
     floor_breach: str | None = None
     markdown: str = ""
 
     @property
     def clean(self) -> bool:
-        return not (self.regressions or self.new_errors or self.beyond_noise or self.floor_breach)
+        # `removed` counts, `added` does not: a test that vanished may be hiding
+        # a regression, whereas a new test has no baseline to regress from.
+        return not (
+            self.regressions
+            or self.new_errors
+            or self.beyond_noise
+            or self.removed
+            or self.floor_breach
+        )
 
 
 def _mark(delta: float, *, inverse: bool = False) -> str:
@@ -580,17 +589,30 @@ def compare(
     b, h = base.overall(), head.overall()
     delta_pts = (h - b) * 100
 
+    # A model present in only one arm makes every one of its tests look added or
+    # removed. That is a change to GATE_MODELS, not to the test suite, so it is
+    # tracked separately and never counted as a disappearing test.
+    shared_models = {m for m, _ in base.by_test} & {m for m, _ in head.by_test}
+    diff.models_changed = sorted(
+        ({m for m, _ in base.by_test} | {m for m, _ in head.by_test}) - shared_models
+    )
+
     # ---- collapse / new-error detection, at (model, test) granularity -------
     # Per-test deltas are reported only on collapse. With ~3 samples per test
     # per run a per-test wobble is mostly noise, and a report that lists every
     # wobble trains people to skim past the part that matters.
     for key in sorted(set(base.by_test) | set(head.by_test)):
         model, test = key
+        if model not in shared_models:
+            continue
         br, hr = base.rate(key), head.rate(key)
         if br is None:
             diff.added.append(f"{model}/{test}")
             continue
         if hr is None:
+            # Counts against `clean`: deleting or renaming a failing test would
+            # otherwise erase the regression it represents, and the run would
+            # report "no regressions" while quietly testing less than before.
             diff.removed.append(f"{model}/{test}")
             continue
         if br >= COLLAPSE_BEFORE and hr <= COLLAPSE_AFTER:
@@ -644,7 +666,8 @@ def compare(
         md.append(
             f"⚠️ **Review required** — Stable tier at {stable_rate:.1%} "
             f"(floor: {STABLE_FLOOR:.0%}), {len(diff.regressions)} collapse(s), "
-            f"{len(diff.new_errors)} new error type(s)"
+            f"{len(diff.new_errors)} new error type(s), "
+            f"{len(diff.removed)} removed test(s)"
         )
     md += [
         "",
@@ -778,12 +801,18 @@ def compare(
         print(f"\n {BOLD}{RED}NEW ERROR TYPES{RESET}")
         for row in diff.new_errors:
             print(f"   {RED}!{RESET} {row.strip('|').replace('|', ' ').replace('`', '')}")
-    if diff.added or diff.removed:
+    if diff.added or diff.removed or diff.models_changed:
         print(f"\n {BOLD}TEST SET CHANGES{RESET}")
         for line in diff.added[:10]:
             print(f"   {GREEN}+{RESET} {line} {DIM}(no baseline){RESET}")
+        if len(diff.added) > 10:
+            print(f"   {DIM}… and {len(diff.added) - 10} more added{RESET}")
         for line in diff.removed[:10]:
-            print(f"   {DIM}- {line} (gone from HEAD){RESET}")
+            print(f"   {RED}-{RESET} {line} {DIM}(gone from HEAD){RESET}")
+        if len(diff.removed) > 10:
+            print(f"   {DIM}… and {len(diff.removed) - 10} more removed{RESET}")
+        for model in diff.models_changed:
+            print(f"   {YELLOW}~{RESET} {model} {DIM}ran in only one arm — not compared{RESET}")
 
     print(f"\n{BOLD}{'─' * 72}{RESET}")
     if diff.floor_breach:
@@ -797,7 +826,8 @@ def compare(
         print(
             f" {YELLOW}VERDICT: {len(diff.regressions)} collapse(s), "
             f"{len(diff.new_errors)} new error type(s), "
-            f"{len(diff.beyond_noise)} aggregate drop(s) — REVIEW REQUIRED.{RESET}"
+            f"{len(diff.beyond_noise)} aggregate drop(s), "
+            f"{len(diff.removed)} removed test(s) — REVIEW REQUIRED.{RESET}"
         )
     print(f"{BOLD}{'─' * 72}{RESET}")
     return diff
@@ -954,7 +984,12 @@ def main() -> int:
     create_draft(args.tag, head_sha, report)
     print(f"\n{DIM}Review the generated notes in the browser before continuing.{RESET}")
     if not confirm(f"Publish {args.tag} to GitHub and PyPI?"):
-        print(f"Aborted. The draft remains; delete with: gh release delete {args.tag}")
+        # --cleanup-tag: plain `gh release delete` leaves the tag behind, and a
+        # stray v0.0.9 tag makes the next attempt fail preflight ("tag already
+        # exists on origin"). Harmless if the draft never created a tag.
+        print(
+            f"Aborted. The draft remains; delete with: gh release delete {args.tag} --cleanup-tag"
+        )
         return 1
 
     publish(args.tag)
