@@ -34,6 +34,11 @@ jobs:
           python-version: "3.12"
       - name: Sync
         run: uv sync --all-extras --no-extra sandbox
+      # tests/tools/test_shell_tools_modern.py skipif-drops 145 tests when `rg`
+      # is not on PATH. ubuntu-latest does not ship ripgrep, so without this
+      # step those tests silently skip and the job passes vacuously. See #65.
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
       - name: Unit tests (no live API calls)
         run: uv run pytest -q -m "not integration and not stress and not sandbox"
       # Sandbox containment tests fork a real worker to exercise the OS-level
