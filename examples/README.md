@@ -53,6 +53,10 @@ from nooa.unifiedllm import get_llm_client
 llm = get_llm_client("gpt-4o-mini")                 # OpenAI (needs OPENAI_API_KEY)
 llm = get_llm_client("claude-sonnet-4-5-20250514")  # Anthropic (needs ANTHROPIC_API_KEY)
 llm = get_llm_client("gemini/gemini-2.5-flash")     # Google (needs GEMINI_API_KEY)
+llm = get_llm_client("ollama_chat/qwen3:1.7b",      # Ollama (no key)
+                     api_base="http://localhost:11434")
+llm = get_llm_client("hosted_vllm/Qwen/Qwen3-1.7B", # vLLM (no key)
+                     api_base="http://localhost:8000/v1")
 ```
 
 Provider packages can register bundled model aliases automatically through the `nooa.bundled_configs` entry-point group. To customize the registry, run `nooa config eject`, drop an `llm_config.yaml` in your project's `.nooa/`, or point `NEMO_OO_LLM_CONFIG` at one or more YAML files. See [`src/nooa/unifiedllm/registry.py`](../src/nooa/unifiedllm/registry.py) for the YAML schema.
