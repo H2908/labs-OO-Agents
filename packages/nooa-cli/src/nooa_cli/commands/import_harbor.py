@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""Import NVIDIA OO Agents OTLP traces from a Harbor job directory into the viewer.
+"""Import NOOA OTLP or portable journal traces from Harbor into the viewer.
 
 Walks a Harbor job directory (or any directory containing one), finds all
 traces under ``artifacts/traces/*.jsonl``, enriches them with Harbor metadata
@@ -24,7 +24,9 @@ import click
 
 from ._otlp_helpers import (
     check_endpoint_reachable,
+    get_journal_record,
     inject_resource_attrs,
+    post_journal_record,
     post_traces_batch,
     session_exists,
     validate_endpoint,
@@ -34,7 +36,7 @@ NAME = "import-harbor"
 
 
 def _find_harbor_traces(root: Path) -> list[Path]:
-    """Find all OTLP trace files nested under Harbor artifact directories.
+    """Find all OTLP or portable journal trace files under Harbor artifacts.
 
     Harbor copies the container's ``/logs/artifacts/`` to ``trial_dir/artifacts/``
     on the host. The agent decides the layout within that directory — a common
@@ -310,7 +312,7 @@ def _import_trace_file(
     batch_lines: int,
     batch_bytes: int,
 ) -> tuple[bool, list[str]]:
-    """Import one OTLP JSONL file, posting its lines in batches.
+    """Import one OTLP or portable journal JSONL file.
 
     Accumulates OTLP bodies and flushes them in batches: many ``resourceSpans``
     envelopes are merged into one POST, avoiding one HTTP request per line. A flush
@@ -345,6 +347,12 @@ def _import_trace_file(
             try:
                 body = json.loads(raw_line)
             except json.JSONDecodeError:
+                continue
+            journal_record = get_journal_record(body)
+            if journal_record is not None:
+                session_id = str(resource_attrs["session.id"])
+                if not post_journal_record(endpoint, journal_record, session_id):
+                    errors.append(f"{jsonl_path.name}: failed to post journal record")
                 continue
             if "resourceSpans" not in body:
                 continue

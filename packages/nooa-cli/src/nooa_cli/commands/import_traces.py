@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""Import OTLP trace .jsonl files into the viewer.
+"""Import OTLP or portable NOOA journal .jsonl files into the viewer.
 
 Usage:
     nooa import-traces ./traces/
@@ -18,8 +18,10 @@ import click
 
 from ._otlp_helpers import (
     check_endpoint_reachable,
+    get_journal_record,
     inject_resource_attrs,
     post_annotations,
+    post_journal_record,
     post_trace,
     session_exists,
     validate_endpoint,
@@ -27,7 +29,7 @@ from ._otlp_helpers import (
 
 NAME = "import-traces"
 
-TRACE_EXTENSIONS = {".jsonl"}
+TRACE_EXTENSIONS = (".nooa.jsonl", ".jsonl")
 
 
 def _find_trace_files(path: Path) -> list[Path]:
@@ -80,7 +82,7 @@ def _session_id_from_filename(path: Path) -> str:
     help="Batch ID for this import (default: auto-generated).",
 )
 def command(path: str, endpoint: str, batch_id: str | None):
-    """Import OTLP trace .jsonl files into the viewer."""
+    """Import OTLP and portable NOOA journal .jsonl files into the viewer."""
     target = Path(path)
     files = _find_trace_files(target)
 
@@ -134,6 +136,12 @@ def command(path: str, endpoint: str, batch_id: str | None):
                 try:
                     body = json.loads(raw_line)
                 except json.JSONDecodeError:
+                    continue
+
+                journal_record = get_journal_record(body)
+                if journal_record is not None:
+                    if not post_journal_record(endpoint, journal_record, session_id):
+                        errors.append(f"{file.name}:{line_num}: failed to post journal record")
                     continue
 
                 # Handle annotation lines from exported traces
