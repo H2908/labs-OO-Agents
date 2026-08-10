@@ -8,6 +8,10 @@ import urllib.request
 
 import click
 
+JOURNAL_ENVELOPE_KEY = "nooaJournal"
+JOURNAL_FORMAT = "nooa.message_journal"
+JOURNAL_VERSION = 1
+
 
 def validate_endpoint(endpoint: str) -> None:
     """Validate that the endpoint uses an HTTP(S) scheme."""
@@ -100,6 +104,57 @@ def post_annotations(endpoint: str, annotations: list[dict]) -> int:
         except Exception:
             pass
     return imported
+
+
+def get_journal_record(body: dict) -> dict | None:
+    """Return a validated NOOA journal envelope, or ``None`` for other lines."""
+    record = body.get(JOURNAL_ENVELOPE_KEY)
+    if not isinstance(record, dict):
+        return None
+    if record.get("format") != JOURNAL_FORMAT or record.get("version") != JOURNAL_VERSION:
+        return None
+    return record
+
+
+def post_journal_record(endpoint: str, record: dict, session_id: str) -> bool:
+    """POST one portable-file journal record to the viewer.
+
+    ``session_id`` is authoritative so renaming a trace file and Harbor's
+    trial-name remapping affect OTLP spans and their journal sideband equally.
+    Manifest records are accepted as no-ops.
+    """
+    record_type = record.get("type")
+    if record_type == "manifest":
+        return True
+    if record_type == "blocks":
+        payload = record.get("blocks")
+        if not isinstance(payload, list):
+            return False
+        path = "/v1/journal/blocks"
+        headers = {"Content-Type": "application/json", "X-Session-Id": session_id}
+    elif record_type == "call":
+        source = record.get("call")
+        if not isinstance(source, dict):
+            return False
+        payload = dict(source)
+        payload["session_id"] = session_id
+        path = "/v1/journal/calls"
+        headers = {"Content-Type": "application/json"}
+    else:
+        return False
+
+    data = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(
+        f"{endpoint.rstrip('/')}{path}",
+        data=data,
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status < 300
+    except Exception:
+        return False
 
 
 def session_exists(endpoint: str, session_id: str) -> bool:
