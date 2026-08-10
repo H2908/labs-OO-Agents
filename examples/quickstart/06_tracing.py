@@ -9,11 +9,17 @@ in the viewer without any setup code. Just create an agent and go.
 Workflow:
   1. nooa start-dev   # start trace viewer and OTLP receiver
   2. uv run python examples/quickstart/06_tracing.py
-  3. View traces at http://localhost:5001
+  3. nooa import-traces traces/quickstart-06-journal
+  4. View traces at http://localhost:5001
 """
 
+from pathlib import Path
+
 from nooa import hidden
+from nooa.tracing import enable_tracing, exporters
 from nooa.util.quickstart import *
+
+TRACE_DIR = Path("traces/quickstart-06-journal")
 
 
 class MathAgent(Agent, llm=llm):
@@ -42,8 +48,9 @@ class MathAgent(Agent, llm=llm):
 
 @autorun
 async def main():
-    # Tracing is auto-enabled when `nooa start-dev` is running.
-    # To write JSONL files instead, call enable_tracing(trace_dir="./traces") explicitly.
+    # The journal file keeps message bodies content-addressed instead of
+    # repeating the full LLM conversation on every OTLP span.
+    enable_tracing(exporters=[exporters.journal_file(TRACE_DIR)])
 
     agent = MathAgent()
     result = await agent.run("(10 + 5) * 2")
@@ -56,5 +63,6 @@ async def main():
     print("  - explain()    ellipsis/LLM method, child of run()")
     print("  - _format()    private helper (also traced)")
     print("=" * 80)
-    print("\nTrace Viewer: http://localhost:5001")
+    print(f"\nJournal trace: {TRACE_DIR}")
+    print(f"Import with: nooa import-traces {TRACE_DIR}")
     print("=" * 80)
