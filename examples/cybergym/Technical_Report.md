@@ -10,7 +10,7 @@ Our CyberGym agent runs as a CodeAct agent with a shell and a todo manager, surv
 
 The underlying model is **OpenAI GPT-5.5** with reasoning effort set to `xhigh`.
 
-**Result: 1,308 / 1,507 tasks solved = 86.8% pass@1.**
+**Result: 1,286 / 1,507 tasks solved = 85.3% pass@1.**
 
 ## 2. Architecture
 
@@ -33,7 +33,7 @@ No cybersecurity domain knowledge, exploit templates, or benchmark-specific hint
 
 * Code: [NOOA CyberGym](nooa_cybergym/main.py)
 
-## 3. Methodology
+## 3. Method
 
 ### 3.1 Benchmark
 
@@ -84,10 +84,10 @@ The token, cost, and timing figures below are per-trial averages over the valid 
 
 | Metric                 | Value     | Comment                                                                                                                   |
 |------------------------|-----------|---------------------------------------------------------------------------------------------------------------------------|
-| Success rate           | 86.8%     | The fraction of attempted tasks that succeeded.                                                                           |
+| Success rate           | 85.3%     | The fraction of attempted tasks that succeeded.                                                                           |
 | Tasks attempted        | 1,507     | The total number of CyberGym Level 1 tasks attempted.                                                                     |
-| Tasks succeeded        | 1,308     | The number of tasks for which a submitted PoC passed the differential-execution check.                                    |
-| Tasks failed           | 199       | The number of tasks for which no submitted PoC succeeded.                                                                 |
+| Tasks succeeded        | 1,286     | The number of tasks for which a submitted PoC passed the differential-execution check.                                    |
+| Tasks failed           | 221       | The number of tasks for which no submitted PoC succeeded.                                                                 |
 | Input tokens           | 343,277   | The average number of non-cached input tokens per trial, covering the prompt and context that were not served from cache. |
 | Cache read tokens      | 3,629,915 | The average number of cached tokens read per trial.                                                                       |
 | Output tokens          | 70,579    | The average number of output tokens generated per trial.                                                                  |
@@ -97,20 +97,20 @@ The token, cost, and timing figures below are per-trial averages over the valid 
 
 ### Comparisons
 
-Top 9 published results on the CyberGym Level 1 leaderboard (one trial, sorted by success rate, as reported on [cybergym.io](https://www.cybergym.io/cybergym/), retrieved 2026-07-28).
+Leading one-trial results from the official CyberGym Level 1 leaderboard, retrieved from [cybergym.io](https://www.cybergym.io/cybergym/) on 2026-08-11, with this work inserted according to its final score.
 
 | #  | Submission                 | Model(s)                                    | Score     | Date           | Source                                                                                                                                                                        |
 |----|----------------------------|---------------------------------------------|-----------|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1  | Wiz Atlas                  | GPT-5.5, Claude Opus 4.6                    | 90.9%     | 2026-07-27     | [Wiz](https://www.wiz.io/blog/atlas-ai-vulnerability-researcher)                                                                                                              |
-| 2  | Crystalline                | Claude Opus 4.6                             | 89.6%     | 2026-06-08     | [Independent researcher](https://github.com/synchopate/cybergym-logos)                                                                                                        |
-| 3  | MDASH                      | GPT-5.4, Claude Opus 4.6, Claude Sonnet 4.6 | 88.4%     | 2026-05-12     | [Microsoft](https://www.microsoft.com/en-us/security/blog/2026/05/12/defense-at-ai-speed-microsofts-new-multi-model-agentic-security-system-tops-leading-industry-benchmark/) |
-| 4  | **NOOA CyberGym**          | **GPT-5.5**                                 | **86.8%** | **2026-07-28** | **This work**                                                                                                                                                                 |
-| 5  | Sangfor AI                 | GLM-5.2                                     | 86.3%     | 2026-07-21     | [Sangfor AI](https://github.com/Sangfor-AI/cybergym-submission-sangfor-ai)                                                                                                    |
+| 1  | MDASH                      | GPT-5.4, Claude Opus 4.6, Claude Sonnet 4.6 | 92.0%     | 2026-06-17     | [Microsoft](https://www.microsoft.com/en-us/security/blog/2026/06/17/beyond-the-benchmark-advancing-security-at-ai-speed/)                                                    |
+| 2  | Wiz Atlas                  | GPT-5.5, Claude Opus 4.6                    | 90.9%     | 2026-07-27     | [Wiz](https://www.wiz.io/blog/atlas-ai-vulnerability-researcher)                                                                                                              |
+| 3  | DoGNAVY                    | GLM-5.2                                     | 90.8%     | 2026-08-03     | [DARKNAVY](https://deepsec.darknavy.net/blog/cybergym)                                                                                                                        |
+| 4  | Crystalline                | Claude Opus 4.6                             | 89.6%     | 2026-06-08     | [Independent researcher](https://github.com/synchopate/cybergym-logos)                                                                                                        |
+| 5  | Sangfor AI                 | GLM-5.2                                     | 86.3%     | 2026-07-21     | [Sangfor AI](https://www.sangfor.com/news-and-press-release/sangfor-ai-ranked-4-on-cybergym-2026)                                                                             |
 | 6  | GPT-5.5-Cyber              | GPT-5.5-Cyber (OpenAI Agent)                | 85.6%     | 2026-06-22     | [OpenAI](https://openai.com/index/daybreak-securing-the-world/)                                                                                                               |
-| 7  | Xuanwu Atuin AI            | GLM-5.2                                     | 84.8%     | 2026-07-22     | [Tencent Xuanwu Lab](https://xlab.tencent.com/en/2026/07/17/xuanwu-atuin-cybergym-glm52/)                                                                                     |
-| 8  | Claude Mythos Preview      | Claude Mythos Preview (Anthropic Agent)     | 83.1%     | 2026-04-07     | [Anthropic](https://www.anthropic.com/claude-mythos-preview-system-card)                                                                                                      |
-| 9  | GPT-5.5                    | GPT-5.5 (OpenAI Agent)                      | 81.8%     | 2026-04-23     | [OpenAI](https://openai.com/index/introducing-gpt-5-5)                                                                                                                        |
-| 10 | GPT-5.4                    | GPT-5.4 (OpenAI Agent)                      | 79.0%     | 2026-04-23     | [OpenAI](https://openai.com/index/introducing-gpt-5-5)                                                                                                                        |
+| 7= | Velldepth Agent            | XekRung                                     | 85.3%     | 2026-08-03     | [Alibaba Security](https://alibaba-velldepth.github.io/writeups/)                                                                                                             |
+| 7= | **NOOA CyberGym**          | **GPT-5.5**                                 | **85.3%** | **2026-08-03** | **This work**                                                                                                                                                                 |
+| 9  | Xuanwu Atuin AI            | GLM-5.2                                     | 84.8%     | 2026-07-22     | [Tencent Xuanwu Lab](https://xlab.tencent.com/en/2026/07/17/xuanwu-atuin-cybergym-glm52/)                                                                                     |
+| 10 | Claude Mythos Preview      | Claude Mythos Preview (Anthropic Agent)     | 83.1%     | 2026-04-07     | [Anthropic](https://www.anthropic.com/claude-mythos-preview-system-card)                                                                                                      |
 
 ## 5. Artifacts
 
@@ -128,4 +128,4 @@ The PoC submissions and accompanying artifacts (trajectories, logs, results) sha
 
 ## 6. Conclusions
 
-On CyberGym Level 1, the NOOA CyberGym agent solves 1,308 of 1,507 tasks (86.8% pass@1), placing it among the top published results on the leaderboard and ahead of every other fully open-source submission. It reaches this level with no cybersecurity domain knowledge, exploit templates, or benchmark-specific hints, only a generic vulnerability-validation workflow expressed as a single object-oriented NOOA agent. The result is therefore attributable to the agent architecture and underlying model rather than task-specific engineering, and it shows that a compact, fully open-source agent can compete with proprietary systems on realistic security tasks.
+On CyberGym Level 1, the NOOA CyberGym agent solves 1,286 of 1,507 tasks (85.3% pass@1), tying for seventh among the comparison results listed above and placing ahead of every other fully open-source agent-harness submission. It reaches this level with no cybersecurity domain knowledge, exploit templates, or benchmark-specific hints, only a generic vulnerability-validation workflow expressed as a single object-oriented NOOA agent. The result is therefore attributable to the agent architecture and underlying model rather than task-specific engineering, and it shows that a compact, fully open-source agent can compete with proprietary systems on realistic security tasks.
