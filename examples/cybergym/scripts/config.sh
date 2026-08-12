@@ -3,13 +3,14 @@
 # Every other script in this directory sources this file. Override any value by
 # exporting it before you run a script, e.g.:
 #
-#   MODEL=openai/gpt-5.5 CYBERGYM_SERVER=http://127.0.0.1:9000 scripts/run_subset.sh
+#   MODEL=glm-5.2 CYBERGYM_SERVER=http://127.0.0.1:9000 scripts/run_subset.sh
 #
 # shellcheck shell=bash
 
 # Root of this example (the directory that contains this scripts/ folder).
 AGENT_REPO="${AGENT_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 export AGENT_REPO
+export FRAMEWORK_REPO="${FRAMEWORK_REPO:-$(cd "$AGENT_REPO/../.." && pwd)}"
 
 # CyberGym benchmark checkout + data (created by scripts/setup.sh).
 export CYBERGYM_REPO="${CYBERGYM_REPO:-$AGENT_REPO/cybergym_repo}"
@@ -35,11 +36,11 @@ if [ -z "${CYBERGYM_API_KEY:-}" ] && [ -f "$AGENT_REPO/.env" ]; then
 fi
 
 # Model + agent image.
-export MODEL="${MODEL:-openai/gpt-5.5}"
+export MODEL="${MODEL:-glm-5.2}"
 export RUNNER_IMAGE="${RUNNER_IMAGE:-nooa/nooa-cybergym:latest}"
 
 # Hard per-task wall-clock limit (seconds). The container is killed at this cap.
-# Keep it above the agent's soft timeout (NOOA_CYBERGYM_SOFT_TIMEOUT_SEC, default
+# Keep it above the agent's soft timeout (CYBERGYM_OO_SOFT_TIMEOUT_SEC, default
 # 13920s / 3h52m) so the agent can return its best PoC gracefully before the kill.
 export TIMEOUT="${TIMEOUT:-14400}"  # 4h
 

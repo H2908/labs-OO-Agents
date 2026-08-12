@@ -55,6 +55,7 @@ test_*.py
 docs/
 *.md
 !README.md
+!THIRD_PARTY_NOTICES.md
 !**/README.md
 *.pdf
 journal/
@@ -117,3 +118,12 @@ debug_http_logs/
 !pyproject.toml
 !uv.lock
 !requirements.txt
+
+# The public CyberGym image is built from the repository root so it can install
+# this exact NOOA checkout. Include only its runtime package from examples/.
+!examples/
+examples/*
+!examples/cybergym/
+examples/cybergym/*
+!examples/cybergym/nooa_cybergym/
+!examples/cybergym/nooa_cybergym/**

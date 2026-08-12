@@ -77,7 +77,7 @@ EOF
 fi
 
 echo "===== BUILD RUNNER IMAGE $(date -Is) ====="
-docker build -t "$RUNNER_IMAGE" .
+docker build -f "$AGENT_REPO/Dockerfile" -t "$RUNNER_IMAGE" "$FRAMEWORK_REPO"
 
 echo "===== RUN ${#TASKS[@]} TASKS $(date -Is) ====="
 for TASK_ID in "${TASKS[@]}"; do

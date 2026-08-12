@@ -300,6 +300,13 @@ ignore = [
 # Tests intentionally use legacy typing syntax (Optional[X], Union[X,Y], Generic[T])
 # to verify that _get_complex_type() handles those annotation forms correctly.
 "tests/test_pure_functions_gl105.py" = ["UP007", "UP045", "UP046"]
+# The CyberGym behavior modules retain their deliberate source style; these
+# findings do not affect correctness and are covered by focused tests.
+"examples/cybergym/nooa_cybergym/agent.py" = ["B007", "I001", "UP037"]
+"examples/cybergym/nooa_cybergym/main.py" = ["I001"]
+"examples/cybergym/nooa_cybergym/shell_tools.py" = ["UP037"]
+"examples/cybergym/nooa_cybergym/submissions.py" = ["I001"]
+"examples/cybergym/nooa_cybergym/util.py" = ["B010", "I001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["nooa", "eval_pipeline", "evaluation", "agentdoc"]
