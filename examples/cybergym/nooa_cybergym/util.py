@@ -1,4 +1,4 @@
-"""Shared utilities for the CyberGym OO agent.
+"""Shared utilities for the NOOA CyberGym agent.
 
 Infrastructure that doesn't belong in the agent classes:
 LLM client creation, reasoning effort, tracing, summarizer installation.
@@ -15,6 +15,7 @@ from nooa import Agent, hidden
 
 with hidden:
     from nooa.agents.summarization import TokenBudgetSummarizer, context_budget
+    from nooa.atif import enable_atif, install_atif
     from nooa.config.summarizer_config import TokenBudgetConfig
     from nooa.tracing import (
         enable_tracing,
@@ -30,15 +31,13 @@ with hidden:
         get_llm_client,
     )
 
-    from nooa.atif import enable_atif, install_atif
-
-logger = logging.getLogger("cybergym_oo")
+logger = logging.getLogger("nooa_cybergym")
 
 DEFAULT_API_BASE = "https://inference-api.nvidia.com/v1"
 DEFAULT_TRACE_DIR = "/logs/artifacts/traces"
 DEFAULT_TRAJECTORY_PATH = "/logs/agent/trajectory.json"
 USE_BATCHING = False
-BATCH_REQUEST_TIMEOUT_S = int(os.environ.get("CYBERGYM_OO_REQUEST_TIMEOUT_S", "3900"))
+BATCH_REQUEST_TIMEOUT_S = int(os.environ.get("NOOA_CYBERGYM_REQUEST_TIMEOUT_S", "3900"))
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +49,7 @@ BATCH_REQUEST_TIMEOUT_S = int(os.environ.get("CYBERGYM_OO_REQUEST_TIMEOUT_S", "3
 def make_llm(model_name: str, *, max_tokens: int = 32768, reasoning_effort: str | None = None):
     """Create an LLM client for the given model, optionally with reasoning effort."""
     if reasoning_effort is None:
-        reasoning_effort = os.environ.get("CYBERGYM_OO_REASONING_EFFORT")
+        reasoning_effort = os.environ.get("NOOA_CYBERGYM_REASONING_EFFORT")
     llm = get_llm_client(
         model_name,
         retry_config=RetryConfig(max_retries=3),
@@ -164,10 +163,10 @@ def install_summarizer(agent: Agent, llm) -> None:
 @hidden
 def configure_tracing(agent, model_name: str) -> None:
     """Set up compact journal + ATIF tracing for one Harbor trial."""
-    trace_dir = os.environ.get("TRACE_DIR") or DEFAULT_TRACE_DIR
-    trajectory_path = os.environ.get("TRAJECTORY_PATH") or DEFAULT_TRAJECTORY_PATH
-    otlp_endpoint = os.environ.get("OTLP_ENDPOINT")
-    session_id = os.environ.get("CYBERGYM_OO_SESSION_ID") or "cybergym-oo-trial"
+    trace_dir = os.environ.get("NOOA_CYBERGYM_TRACE_DIR") or DEFAULT_TRACE_DIR
+    trajectory_path = os.environ.get("NOOA_CYBERGYM_TRAJECTORY_PATH") or DEFAULT_TRAJECTORY_PATH
+    otlp_endpoint = os.environ.get("NOOA_CYBERGYM_OTLP_ENDPOINT")
+    session_id = os.environ.get("NOOA_CYBERGYM_SESSION_ID") or "nooa-cybergym-trial"
 
     enabled: list[str] = []
     try:
@@ -190,12 +189,12 @@ def configure_tracing(agent, model_name: str) -> None:
             agent.event_manager,
             path=trajectory_path,
             session_id=session_id,
-            agent_name="cybergym-oo",
+            agent_name="nooa-cybergym",
             agent_version="0.1.0",
             agent_model_name=model_name,
             cascade_to_standalones=True,
         )
-        setattr(agent, "_atif_uninstall", atif_uninstall)
+        agent._atif_uninstall = atif_uninstall
         enabled.append(f"atif:{trajectory_path}")
 
         # Auto-instrument sub-agents (Finder/Expander) created after this point.

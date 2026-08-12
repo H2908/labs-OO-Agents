@@ -19,7 +19,6 @@ from cybergym.task.gen_task import generate_task
 from cybergym.task.types import TaskConfig, TaskDifficulty
 
 ENV_PREFIXES = (
-    "CYBERGYM_OO_",
     "NOOA_CYBERGYM_",
     "OPENAI_",
     "ANTHROPIC_",
@@ -28,7 +27,6 @@ ENV_PREFIXES = (
     "TOGETHER_",
     "NVIDIA_",
 )
-EXTRA_ENVS = {"OTLP_ENDPOINT", "TRACE_DIR", "TRAJECTORY_PATH", "NEMO_OO_LLM_CONFIG"}
 DEFAULT_IMAGE = "nooa/nooa-cybergym:latest"
 DEFAULT_PROMPT = (
     "Generate raw-input PoCs for the vulnerability described in "
@@ -57,11 +55,8 @@ def load_dotenv(path: Path) -> None:
 def forwarded_env() -> dict[str, str]:
     env: dict[str, str] = {}
     for key, value in os.environ.items():
-        if key.startswith(ENV_PREFIXES) or key in EXTRA_ENVS:
+        if key.startswith(ENV_PREFIXES):
             env[key] = value
-    env.setdefault("CYBERGYM_ARTIFACTS_DIR", "/logs/artifacts")
-    env.setdefault("CYBERGYM_LOG_PATH", "/logs/artifacts/log.txt")
-    env.setdefault("NEMO_OO_LLM_CONFIG", "/app/nooa_cybergym/llm_config.yaml")
     return env
 
 
@@ -198,15 +193,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--timeout", type=int, default=14400)
     parser.add_argument(
-        "--max-iter", type=int, help="Override CYBERGYM_OO_MAX_ITERATIONS for this run"
+        "--max-iter", type=int, help="Override NOOA_CYBERGYM_MAX_ITERATIONS for this run"
     )
     parser.add_argument(
         "--max-output-tokens",
         type=int,
-        help="Override CYBERGYM_OO_MAX_OUTPUT_TOKENS for this run",
+        help="Override NOOA_CYBERGYM_MAX_OUTPUT_TOKENS for this run",
     )
     parser.add_argument(
-        "--soft-timeout", type=int, help="CYBERGYM_OO_SOFT_TIMEOUT_SEC for the in-container agent"
+        "--soft-timeout",
+        type=int,
+        help="NOOA_CYBERGYM_SOFT_TIMEOUT_SEC for the in-container agent",
     )
     parser.add_argument(
         "--min-exploration",
@@ -255,19 +252,19 @@ def main(argv: list[str] | None = None) -> int:
     network = None
     server = args.server
     env = forwarded_env()
-    env["CYBERGYM_OO_SESSION_ID"] = run_name
+    env["NOOA_CYBERGYM_SESSION_ID"] = run_name
     if args.max_iter is not None:
-        env["CYBERGYM_OO_MAX_ITERATIONS"] = str(args.max_iter)
+        env["NOOA_CYBERGYM_MAX_ITERATIONS"] = str(args.max_iter)
     if args.max_output_tokens is not None:
-        env["CYBERGYM_OO_MAX_OUTPUT_TOKENS"] = str(args.max_output_tokens)
+        env["NOOA_CYBERGYM_MAX_OUTPUT_TOKENS"] = str(args.max_output_tokens)
     if args.soft_timeout:
-        env["CYBERGYM_OO_SOFT_TIMEOUT_SEC"] = str(args.soft_timeout)
+        env["NOOA_CYBERGYM_SOFT_TIMEOUT_SEC"] = str(args.soft_timeout)
     if args.min_exploration is not None:
-        env["CYBERGYM_OO_MIN_EXPLORATION_SEC"] = str(args.min_exploration)
+        env["NOOA_CYBERGYM_MIN_EXPLORATION_SEC"] = str(args.min_exploration)
     if args.max_concurrent_expanders is not None:
-        env["CYBERGYM_OO_MAX_CONCURRENT_EXPANDERS"] = str(args.max_concurrent_expanders)
+        env["NOOA_CYBERGYM_MAX_CONCURRENT_EXPANDERS"] = str(args.max_concurrent_expanders)
     if args.reasoning_effort:
-        env["CYBERGYM_OO_REASONING_EFFORT"] = args.reasoning_effort
+        env["NOOA_CYBERGYM_REASONING_EFFORT"] = args.reasoning_effort
 
     proxy = None
     if args.use_firewall or args.connect_firewall:

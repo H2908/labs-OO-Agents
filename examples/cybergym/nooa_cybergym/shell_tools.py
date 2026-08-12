@@ -609,7 +609,7 @@ class ShellTools(Skill):
             tuple[int, int] | None,
             spec(description="(start, end) 1-indexed inclusive, or None for whole file"),
         ] = None,
-    ) -> "Match | str":
+    ) -> Match | str:
         """
         Read a file (or line range), with automatic binary fallback.
 

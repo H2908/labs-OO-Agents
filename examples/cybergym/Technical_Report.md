@@ -1,165 +1,101 @@
 # NOOA CyberGym
 
+<!-- **Contact:** TODO -->
+
 ## 1. Overview
 
-This example implements a [NOOA](https://github.com/NVIDIA-NeMo/labs-OO-Agents)-based agent for [CyberGym](https://www.cybergym.io/cybergym/) Level 1. The agent receives a vulnerability description and the pre-patch source tree, then generates raw-input proof-of-concept files for the CyberGym verifier.
+This submission evaluates an agent built on [**NOOA**](https://github.com/NVIDIA-NeMo/labs-OO-Agents) on the **CyberGym Level 1** benchmark ([cybergym.io](https://www.cybergym.io/cybergym/)), where the agent gets a vulnerability description plus the pre-patch codebase and must produce a proof-of-concept input that crashes the pre-patch binary but not the patched one.
 
-The agent uses a portfolio-style multi-agent architecture:
+The submitted agent uses a portfolio of three persistent finder agents. Each finder independently analyzes the source and submits candidate PoCs. Verified crash families are shared through a typed portfolio, a reviewer steers further exploration, and bounded expander agents search for alternative trigger paths.
 
-- Three persistent finder agents independently inspect source and generate PoCs.
-- A deterministic submission manager classifies verifier output and fingerprints crashes.
-- A shared portfolio communicates verified crash families and reviewer guidance.
-- A reviewer steers exploration and decides when sufficient diversity has been reached.
-- Expander agents derive alternate trigger paths from newly discovered crash families.
+The finder models are **GLM-5.2**, **Nemotron 3 Ultra**, and **DeepSeek V4 Flash**. GLM-5.2 is also used by the orchestrator, reviewer, and expanders.
 
-The configured finder models are GLM-5.2, Nemotron 3 Ultra, and DeepSeek V4 Flash. GLM-5.2 is also used by the orchestrator, reviewer, and expanders.
+**Result: pending completion of final validation and infrastructure-error retries.**
 
-## 2. NOOA agent model
+## 2. Architecture
 
-NOOA represents an agent as a Python object: fields are state, methods are capabilities, docstrings are prompts, and return annotations are contracts. A method with an ellipsis body is executed by an LLM strategy, while methods with ordinary Python bodies remain deterministic.
+### 2.1 NOOA SDK
 
-The CyberGym implementation separates model-driven exploration from benchmark mechanics:
+NOOA is a model-agnostic, open-source Python framework for building AI agents. Where most frameworks split prompts, tools, callbacks, and workflow graphs into separate abstractions, NOOA represents an agent as a single Python class: its fields are state, its methods are capabilities, its docstrings are prompts, and its type annotations are enforced contracts. A method whose body is an ellipsis (`...`) is completed at runtime by an LLM-driven loop, while a method with a normal body runs as ordinary deterministic Python.
 
-- [agent.py](nooa_cybergym/agent.py) defines the finder, expander, portfolio, reviewer, and orchestration loop.
-- [submissions.py](nooa_cybergym/submissions.py) owns verifier invocation, result classification, crash fingerprinting, and submission records.
-- [shell_tools.py](nooa_cybergym/shell_tools.py) provides persistent shell and file operations.
-- [util.py](nooa_cybergym/util.py) creates model clients and configures summarization and tracing.
-- [main.py](nooa_cybergym/main.py) is the in-container entry point.
-- [run.py](nooa_cybergym/run.py) is the host-side CyberGym and Docker integration.
+The design unifies six model-facing ideas: typed input/output, pass by reference to live Python objects, code as action, programmable orchestration loops, explicit typed object state, and model-callable harness APIs.
 
-## 3. Architecture
+- Code: [NOOA](https://github.com/NVIDIA-NeMo/labs-OO-Agents).
+- Paper: [NVIDIA-labs OO Agents: Native Python Object-Oriented Agents](https://arxiv.org/abs/2607.20709).
 
-### 3.1 Finder lanes
+### 2.2 NOOA CyberGym Agent
 
-Each configured lane owns a persistent `Finder` instance. A finder reads the vulnerability description, source tree, input harness, and build metadata. It creates minimal candidate inputs and calls its typed `submit()` method with both the file path and a concise trigger hypothesis.
+The NOOA CyberGym agent runs inside each trial container as a portfolio-style multi-agent system. Three persistent finder lanes independently inspect the vulnerability description, pre-patch source tree, input harness, and build metadata. Each finder can use a persistent shell and submit candidate input files through a typed submission method.
 
-Finders do not execute the hidden vulnerable binary directly. The submission API is their test loop. Its result includes a status, exit code, output excerpt, submission number, and normalized crash fingerprint.
+The submission manager keeps benchmark mechanics out of model prompts. It invokes the CyberGym submission interface, classifies verifier output, fingerprints sanitizer crashes and fatal signals, and records each candidate together with the finder's trigger hypothesis. The shared portfolio exposes only distinct verified crash families and reviewer guidance to the workers.
 
-The lanes are:
+The orchestrator reviews the portfolio when a finder finishes or a new crash family appears. The reviewer assesses whether the crashes target the described vulnerability, provides guidance, and recommends when to stop. Each new finder-sourced family can seed an expander that searches for alternate trigger paths; expander results do not recursively create more expanders. A minimum exploration interval prevents an early stop, and bounded concurrency, iteration limits, memory checks, summarization, and a soft timeout keep the run within the trial budget.
 
-| Lane | Model alias |
-|---|---|
-| GLM-5.2 | `glm-5.2` |
-| Nemotron 3 Ultra | `nvidia/nemotron-3-ultra` |
-| DeepSeek V4 Flash | `deepseek-v4-flash` |
+No cybersecurity domain knowledge, exploit templates, or benchmark-specific hints are supplied to the agent beyond what the configured models already bring from pretraining. The workflow is a generic vulnerability-analysis and validation process.
 
-Aliases and gateway model identifiers are defined in [llm_config.yaml](nooa_cybergym/llm_config.yaml).
+- Code: [NOOA CyberGym](nooa_cybergym/agent.py)
 
-### 3.2 Submission manager
+## 3. Method
 
-`SubmissionManager` is the sole interface to `/workspace/submit.sh`. It:
+### 3.1 Benchmark
 
-1. Shell-quotes the candidate path and invokes the verifier.
-2. Parses the final JSON object from the verifier output.
-3. Classifies the result as `crashed`, `crashed_suspect`, `no_crash`, `timeout`, or `server_error`.
-4. Recognizes sanitizer signatures, fatal process signals, infrastructure failures, and assertion-only failures.
-5. Creates a stable crash fingerprint from sanitizer type, error type, deduplication token, stack frames, assertions, and exit behavior.
-6. Records submission metadata and worker hypotheses in `submissions.jsonl`.
+[CyberGym](https://www.cybergym.io/cybergym/) is a benchmark for evaluating AI agents on realistic cybersecurity tasks. It contains 1,507 real-world vulnerabilities from 188 open-source projects, where agents must analyze vulnerable codebases and generate proof-of-concept (PoC) exploits.
 
-Crash fingerprints allow the orchestration layer to reason about distinct families without placing raw submission bookkeeping in the model prompts.
+In the primary *Level 1* setting, agents receive a vulnerability description and the vulnerable (pre-patch) codebase, and must generate a proof-of-concept (PoC) input that triggers the vulnerability. Solutions are evaluated using differential execution: a PoC must crash the pre-patch binary while failing to crash the post-patch version, ensuring it targets the intended vulnerability rather than an unrelated bug.
 
-### 3.3 Shared portfolio
+*Level 0* is a harder setting in which agents receive only the vulnerable codebase and must first discover the vulnerability. We train and evaluate our agent only on the standard *Level 1* setting.
 
-The `Portfolio` is the only shared state between workers. It stores submissions, reviewer guidance, stop state, and bookkeeping for expanded crash families.
+### 3.2 Agent Configuration
 
-Finders receive portfolio changes as append-only `Feedback` events. The rendered portfolio contains only distinct verified crash families, their representative PoC paths, relevant stack frames, worker hypotheses, and current reviewer guidance. Stable rendering helps preserve prompt-cache reuse between meaningful changes.
+- **Agent framework**: NOOA
+- **Finder models**: GLM-5.2, Nemotron 3 Ultra, and DeepSeek V4 Flash
+- **Orchestrator, reviewer, and expander model**: GLM-5.2
+- **Tools**: Python runtime with persistent shell and typed CyberGym submission interface
+- **Minimum exploration time**: 1,200 s
+- **Maximum concurrent expanders**: 2
+- **Soft timeout**: 13,920 s (~3.87 h), returns the best verified portfolio found so far
 
-### 3.4 Reviewer
+### 3.3 Access to Vulnerable vs. Patched Builds
 
-The orchestrator reviews the portfolio whenever a finder finishes or a new crash family appears. The reviewer returns a typed `Review` containing:
+The agent is provided only the pre-patch (vulnerable) program (`repo-vul.tar.gz`); the post-patch (`-fix`) image is never accessible to the agent during runtime. Only the submission server uses the `-fix` image, and only to verify that the submitted PoC crashes the vulnerable build but no longer crashes the patched one. The agent must therefore reason about which PoC best matches the described vulnerability without ever seeing the fix.
 
-- `on_target`: whether the discovered crashes match the described vulnerability.
-- `guidance`: what workers should explore next.
-- `stop`: whether further exploration is unlikely to find another family.
-- `reasoning`: a concise justification.
+### 3.4 Pass@1
 
-A stop recommendation is honored only after the minimum exploration interval, which defaults to 1,200 seconds.
+Tasks are run only once. Only infrastructure failures trigger a retry, specifically when the agent returns a non-zero exit code due to crashes caused by API issues, Docker failures, or out-of-memory kills. Each attempt is capped at 4 hours of agent wall-clock time.
 
-### 3.5 Expanders
+### 3.5 Network Isolation
 
-Each distinct finder-sourced crash family can seed one `Expander`. Expanders read the submitted seed, inspect the implicated source path, trace callers and branch conditions backward, and create minimal mutations intended to reach the same vulnerability through different paths.
+Each CyberGym task runs in an isolated Docker environment: the agent and task server share an internal-only network with no direct egress, while a mitmproxy sidecar connected to both the internal and external networks provides the sole external route for processes in the agent container. The proxy permits only explicitly allowlisted package repositories and configured LLM endpoints, rejects other destinations, and inspects supported gateway API requests to remove known hosted web-search, web-fetch, remote-execution, and MCP tools. These interventions are logged per trial, providing auditable restricted runtime internet access. In addition, automated and manual inspection of the logs and trajectories revealed no successful web fetch attempts.
 
-At most two expanders run concurrently by default. Expander-generated crashes do not recursively seed more expanders.
+### 3.6 Scoring
 
-### 3.6 Lifecycle and resource bounds
+An agent can submit many PoCs while working a task, so a task's success can be counted two ways ([CyberGym FAQ](https://github.com/sunblaze-ucb/cybergym/commit/9d260764113a62f0d339d76e7f874211e5ce41fa), Q3):
 
-Finders are persistent objects and are started again after a CodeAct call finishes, retaining their event histories and portfolio feedback. The orchestrator also applies:
+- **Any-of**: the task counts as solved if *any* submitted PoC succeeds.
+- **Final-submission**: the task counts as solved only if the single PoC the agent designates as its final answer succeeds.
 
-- A 3,500 MB process RSS guard to exit before the container limit.
-- A default 13,920-second cooperative soft timeout.
-- A default 300 CodeAct iterations per finder call.
-- Half that iteration budget for each expander call.
-- Token-budget summarization at 80% of each model's configured context window.
+**We report the any-of metric**: a task is solved if any PoC the agent submitted during the run satisfies the differential-execution check. We adopt *any-of* because the portfolio is built through iterative submission, and this metric captures whether the agent found a valid PoC during its allotted run.
 
-At shutdown, active workers are cancelled and the current portfolio is written as the final result.
+### 3.7 Dynamic Analysis Setup
 
-## 4. CyberGym environment
+Agents do not have direct access to the vulnerable or fixed binaries. The agent has shell access to its own task container, including `/workspace/task_data/` and a typed wrapper around `/workspace/submit.sh`. Submissions are sent to a task-server sidecar, which runs the PoC on the vulnerable binary and returns sanitizer feedback. The fixed binary and reference PoC are not exposed to the agent and are used only by the verifier/scoring path. The agent can write and execute helper code in its container and submit arbitrarily many PoCs, but it cannot inspect or directly execute the hidden vulnerable/fixed binaries, read `/tmp/poc`, or access git history.
 
-### 4.1 Task data
+## 4. Results
 
-The runner generates a CyberGym task directory and mounts it at `/workspace/task_data`. The agent reads `description.txt` and extracts `repo-vul.tar.gz` once before launching workers. `/workspace/submit.sh` is mounted read-only and is the only route to vulnerable-build execution.
+Final results will be added after the full run has completed infrastructure-error retries and the submission has passed final validation. Preliminary or incomplete aggregates are intentionally not reported as a leaderboard score.
 
-### 4.2 Vulnerable and fixed builds
+### Metrics
 
-The agent receives the pre-patch source but cannot inspect or directly execute the hidden vulnerable or fixed binaries. Submissions are sent to the CyberGym server, which executes candidates against the vulnerable build and returns the result. Fixed-build validation remains outside the agent container and is performed by the validation workflow.
+The final table will report success rate, attempted/succeeded/failed tasks, per-trial token usage, estimated cost, wall-clock time, and LLM request count over valid trials.
 
-### 4.3 Network boundary
+### Comparisons
 
-The public runner supports CyberGym's firewall mode. The agent container joins the firewall network, uses proxy environment variables supplied by CyberGym, and adds the hostname of the configured LLM gateway to the proxy allowlist. Other endpoints can be supplied explicitly through `CYBERGYM_FIREWALL_EXTRA_DOMAINS`.
+The leaderboard comparison will be refreshed when the final score is available.
 
-The model endpoint is selected from `OPENAI_BASE_URL`, then `OPENAI_API_BASE`, with the configured NVIDIA inference endpoint as the default. Credentials are supplied at runtime and are not stored in the repository.
+## 5. Artifacts
 
-## 5. Reproducibility
+The open-source agent implementation is available in [nooa_cybergym](nooa_cybergym). Artifacts for the submitted run will be linked after final validation; the complete leaderboard-submission dataset is not included here.
 
-The image is built from the repository root and installs NOOA from the same checkout as the example. Runtime dependencies are exported from `uv.lock` and installed with hash verification. This keeps the framework, agent, and dependency graph aligned for a run.
+## 6. Conclusions
 
-The standard workflow is documented in [README.md](README.md):
-
-1. Run `scripts/setup.sh` to create the uv environment, install CyberGym, fetch the 10-task subset, and build the agent image.
-2. Run `scripts/start_server.sh` in a dedicated terminal.
-3. Run `scripts/run_subset.sh` to execute the configured tasks.
-4. Run `scripts/validate.sh` to replay submissions against the fixed builds.
-
-Each task records its invocation, console output, final portfolio, submission log, portable journal traces, and ATIF trajectory under its run directory.
-
-## 6. Verification
-
-The checked-in test suite covers the current implementation's deterministic behavior, including:
-
-- Sanitizer, signal, timeout, infrastructure, and assertion classification.
-- Stable crash fingerprint and cluster generation.
-- Submission path quoting and hypothesis recording.
-- Portfolio rendering and append-only finder feedback.
-- Crash-family deduplication and expander selection.
-- Finder, expander, and orchestrator configuration.
-- Model alias and reasoning-effort resolution.
-- Journal and ATIF trace installation.
-- Soft-timeout output and tracing-shutdown behavior.
-
-Run the focused suite from the repository root:
-
-```bash
-uv run pytest -q \
-  tests/test_cybergym_portfolio_agent.py \
-  tests/test_cybergym_portfolio_main.py
-```
-
-The Docker image is additionally exercised with in-container import, CLI, artifact-path, and three-model registry smoke tests. End-to-end benchmark results depend on access to an OpenAI-compatible gateway exposing all configured model identifiers.
-
-## 7. Output artifacts
-
-A run produces:
-
-```text
-<run-root>/logs/<task>-<agent-id>/
-├── args.json
-├── console.log
-├── agent/
-│   └── trajectory.json
-└── artifacts/
-    ├── output.txt
-    ├── submissions.jsonl
-    └── traces/
-```
-
-`output.txt` contains the final portfolio summary. `submissions.jsonl` records every candidate and normalized fingerprint. `trajectory.json` uses the ATIF schema, while `traces/` contains portable NOOA journal records for detailed inspection.
+Conclusions will be added after final validation of the submitted run.

@@ -4,11 +4,7 @@ FROM python:3.12-slim
 
 COPY --from=uv /uv /uvx /bin/
 
-ENV PYTHONUNBUFFERED=1 \
-    CYBERGYM_TASK_DIR=/workspace \
-    CYBERGYM_ARTIFACTS_DIR=/logs/artifacts \
-    CYBERGYM_LOG_PATH=/logs/artifacts/log.txt \
-    NEMO_OO_LLM_CONFIG=/app/nooa_cybergym/llm_config.yaml
+ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
@@ -43,5 +39,6 @@ RUN uv export --frozen --no-dev --extra tracing --package nooa \
 WORKDIR /app
 RUN mkdir -p /logs/artifacts && ln -s /logs/artifacts /app/artifacts
 COPY examples/cybergym/nooa_cybergym ./nooa_cybergym
+COPY examples/cybergym/nooa_cybergym/llm_config.yaml ./.nooa/llm_config.yaml
 
 CMD ["python", "-m", "nooa_cybergym.main", "--help"]

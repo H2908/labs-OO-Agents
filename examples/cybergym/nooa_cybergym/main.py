@@ -1,4 +1,4 @@
-"""CyberGym OO Agent — entry point.
+"""NOOA CyberGym agent entry point.
 
 Invoked inside the trial container as:
     python main.py --prompt "..." --model glm-5.2
@@ -31,6 +31,7 @@ with hidden:
         )
     except ImportError:  # pragma: no cover - script mode inside /app
         from agent import DEFAULT_MODEL_NAME, CyberGymAgent
+
         from util import (
             DEFAULT_API_BASE,  # noqa: F401 -- re-exported for runner tests
             _apply_reasoning_effort,  # noqa: F401 -- re-exported for runner tests
@@ -43,13 +44,13 @@ with hidden:
 
 ARTIFACTS_DIR = Path("/app/artifacts")
 LOG_PATH = Path("/logs/artifacts/log.txt")
-MAX_OUTPUT_TOKENS = int(os.environ.get("CYBERGYM_OO_MAX_OUTPUT_TOKENS", "32768"))
-SOFT_TIMEOUT_SEC = int(os.environ.get("CYBERGYM_OO_SOFT_TIMEOUT_SEC", "13920"))
+MAX_OUTPUT_TOKENS = int(os.environ.get("NOOA_CYBERGYM_MAX_OUTPUT_TOKENS", "32768"))
+SOFT_TIMEOUT_SEC = int(os.environ.get("NOOA_CYBERGYM_SOFT_TIMEOUT_SEC", "13920"))
 TRACING_SHUTDOWN_TIMEOUT_SEC = float(
-    os.environ.get("CYBERGYM_OO_TRACING_SHUTDOWN_TIMEOUT_SEC", "30")
+    os.environ.get("NOOA_CYBERGYM_TRACING_SHUTDOWN_TIMEOUT_SEC", "30")
 )
 
-logger = logging.getLogger("cybergym_oo")
+logger = logging.getLogger("nooa_cybergym")
 
 
 @hidden
@@ -68,7 +69,7 @@ def _setup_logging() -> None:
     except OSError:
         pass
 
-    # Stream handler — keeps agent/cybergym-oo.txt populated
+    # Stream handler — keeps the CyberGym agent log populated.
     sh = logging.StreamHandler(sys.stdout)
     sh.setLevel(logging.INFO)
     sh.setFormatter(fmt)
@@ -77,7 +78,7 @@ def _setup_logging() -> None:
 
 @hidden
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="CyberGym OO Agent")
+    parser = argparse.ArgumentParser(description="NOOA CyberGym agent")
     parser.add_argument("--prompt", required=True, help="Task instruction")
     parser.add_argument(
         "--model",
@@ -86,7 +87,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--reasoning-effort",
-        default=os.environ.get("CYBERGYM_OO_REASONING_EFFORT"),
+        default=os.environ.get("NOOA_CYBERGYM_REASONING_EFFORT"),
         help="Reasoning effort knob forwarded to LiteLLM.",
     )
     return parser.parse_args()
@@ -112,7 +113,9 @@ def _shutdown_tracing_with_timeout(timeout_sec: float = TRACING_SHUTDOWN_TIMEOUT
         finally:
             done.set()
 
-    thread = threading.Thread(target=run_shutdown, name="cybergym-oo-tracing-shutdown", daemon=True)
+    thread = threading.Thread(
+        target=run_shutdown, name="nooa-cybergym-tracing-shutdown", daemon=True
+    )
     thread.start()
     thread.join(timeout=max(0.0, timeout_sec))
     if done.is_set():

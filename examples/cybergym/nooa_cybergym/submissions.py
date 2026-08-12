@@ -1,4 +1,4 @@
-"""Submission protocol and portfolio state for the CyberGym OO agent."""
+"""Submission protocol and portfolio state for the NOOA CyberGym agent."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from nooa.tools.shell_tools import ShellTools
-
 
 SubmitStatus = Literal[
     "crashed",

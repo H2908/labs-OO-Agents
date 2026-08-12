@@ -1,4 +1,4 @@
-"""CyberGym OO Agent — agent classes.
+"""NOOA CyberGym agent classes.
 
 Portfolio-centric design:
 - Portfolio is the only shared state and communication channel.
@@ -20,8 +20,8 @@ from pydantic import BaseModel
 from nooa import Agent, hidden, strategy
 from nooa.agentdoc.core import doc
 from nooa.config.strategy_config import CodeActConfig
-from nooa.strategies import CodeActStrategy
 from nooa.events import Feedback
+from nooa.strategies import CodeActStrategy
 
 try:
     from .shell_tools import ShellTools
@@ -43,7 +43,7 @@ try:
 except ImportError:  # pragma: no cover
     from submissions import PocSubmission, SubmissionManager, SubmitResult  # type: ignore[no-redef]
 
-logger = logging.getLogger("cybergym_oo")
+logger = logging.getLogger("nooa_cybergym")
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -67,11 +67,11 @@ def _get_rss_mb() -> float:
 DESCRIPTION_PATH = Path("/workspace/task_data/description.txt")
 DEFAULT_MODEL_NAME = "glm-5.2"
 
-MAX_ITERATIONS = int(os.environ.get("CYBERGYM_OO_MAX_ITERATIONS", "300"))
-MAX_OUTPUT_TOKENS = int(os.environ.get("CYBERGYM_OO_MAX_OUTPUT_TOKENS", "32768"))
-SOFT_TIMEOUT_SEC = int(os.environ.get("CYBERGYM_OO_SOFT_TIMEOUT_SEC", "13920"))
-MIN_EXPLORATION_SEC = int(os.environ.get("CYBERGYM_OO_MIN_EXPLORATION_SEC", "1200"))
-MAX_CONCURRENT_EXPANDERS = int(os.environ.get("CYBERGYM_OO_MAX_CONCURRENT_EXPANDERS", "2"))
+MAX_ITERATIONS = int(os.environ.get("NOOA_CYBERGYM_MAX_ITERATIONS", "300"))
+MAX_OUTPUT_TOKENS = int(os.environ.get("NOOA_CYBERGYM_MAX_OUTPUT_TOKENS", "32768"))
+SOFT_TIMEOUT_SEC = int(os.environ.get("NOOA_CYBERGYM_SOFT_TIMEOUT_SEC", "13920"))
+MIN_EXPLORATION_SEC = int(os.environ.get("NOOA_CYBERGYM_MIN_EXPLORATION_SEC", "1200"))
+MAX_CONCURRENT_EXPANDERS = int(os.environ.get("NOOA_CYBERGYM_MAX_CONCURRENT_EXPANDERS", "2"))
 
 
 class Lane(BaseModel):
@@ -145,7 +145,7 @@ class Portfolio:
                 if submission.fingerprint.cluster_key not in existing_keys:
                     families = len(existing_keys) + 1
                     print(
-                        f"[cybergym-oo] NEW CRASH FAMILY #{families}: "
+                        f"[nooa-cybergym] NEW CRASH FAMILY #{families}: "
                         f"cluster={submission.fingerprint.cluster_key} "
                         f"summary={submission.fingerprint.summary}",
                         flush=True,
@@ -223,7 +223,7 @@ class Portfolio:
         ]
         if not crash_clusters:
             lines.append("- none yet")
-        for key, s in sorted(crash_clusters.items()):
+        for _key, s in sorted(crash_clusters.items()):
             path = s.submitted_path or s.original_path
             code_path = (
                 " -> ".join(s.fingerprint.top_frames) if s.fingerprint.top_frames else "unknown"
@@ -364,10 +364,10 @@ class Expander(Agent, context={"state": None}):
     """Expander agent: given a seed crash, finds variant trigger paths."""
 
     shell = ShellTools(cwd="/workspace")
-    _portfolio: Annotated["Portfolio | None", hidden] = None
+    _portfolio: Annotated[Portfolio | None, hidden] = None
     _model_name: Annotated[str, hidden] = ""
 
-    def __init__(self, *, portfolio: "Portfolio", model_name: str = "", **kwargs):
+    def __init__(self, *, portfolio: Portfolio, model_name: str = "", **kwargs):
         super().__init__(**kwargs)
         self._portfolio = portfolio
         self._model_name = model_name

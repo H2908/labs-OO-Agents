@@ -27,29 +27,37 @@ boundary, reproducibility design, and verification coverage.
 - Python 3.12 or 3.13
 - [uv](https://docs.astral.sh/uv/)
 - Git LFS (`git lfs version` should work)
-- LLM credentials (put in `.env`) for the model configured in [`nooa_cybergym/llm_config.yaml`](nooa_cybergym/llm_config.yaml)
+- LLM credentials (put in `.env`) for all models configured in [`nooa_cybergym/llm_config.yaml`](nooa_cybergym/llm_config.yaml)
 
 The default configuration uses three finder models—GLM-5.2, Nemotron 3 Ultra,
 and DeepSeek V4 Flash—with GLM-5.2 as the orchestrator, reviewer, and expander
-model. All three were exposed through one OpenAI-compatible gateway. To reproduce
-that setup, put the gateway credential and URL in `.env`:
+model. The submitted run exposed all three through one OpenAI-compatible gateway.
+To reproduce that setup, put the gateway credential and URL in `.env`:
 
 ```bash
 OPENAI_API_KEY=...
 OPENAI_BASE_URL=https://your-openai-compatible-gateway.example/v1
 ```
 
-The aliases and exact gateway model identifiers are recorded in
-[`nooa_cybergym/llm_config.yaml`](nooa_cybergym/llm_config.yaml). Your gateway
-must expose those identifiers, or you must adapt their `model_name` mappings.
-Changing the models can materially change results. The runner automatically adds
-the hostname from `OPENAI_BASE_URL` or `OPENAI_API_BASE` to the firewall; use
-`CYBERGYM_FIREWALL_EXTRA_DOMAINS` only for additional hosts.
+Configure the models available through your LLM provider in
+[`nooa_cybergym/llm_config.yaml`](nooa_cybergym/llm_config.yaml). Model names and
+providers must be supported by LiteLLM. The aliases referenced by the finder
+lanes in [`agent.py`](nooa_cybergym/agent.py) must match entries in that file.
 
-`--model` selects the top-level orchestrator/reviewer. Finder lanes and the
-expander model intentionally remain defined in
-[`agent.py`](nooa_cybergym/agent.py) so the configured portfolio is explicit and
-versioned.
+| Setting | Where to configure it |
+|---|---|
+| Provider credentials and shared endpoint | `.env` |
+| Model aliases, provider model names, and token limits | `nooa_cybergym/llm_config.yaml` |
+| Finder models | `LANES` in `nooa_cybergym/agent.py` |
+| Orchestrator and reviewer model | `--model` (default: `glm-5.2`) |
+| Expander model | `DEFAULT_MODEL_NAME` in `nooa_cybergym/agent.py` |
+
+The current plumbing passes one endpoint and credential to every configured
+model. Using provider-specific endpoints or credentials requires adapting the
+client construction in `util.py`. Changing the models can materially change
+results. The runner automatically adds the hostname from `OPENAI_BASE_URL` or
+`OPENAI_API_BASE` to the firewall; use `CYBERGYM_FIREWALL_EXTRA_DOMAINS` only for
+additional hosts.
 
 You do **not** need to set a CyberGym API key: `scripts/setup.sh` generates a
 random local one into `.env` (which is gitignored). It is just a shared token
