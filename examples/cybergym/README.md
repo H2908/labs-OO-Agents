@@ -14,6 +14,13 @@ new family. The behavior-defining files (`agent.py`, `main.py`, `shell_tools.py`
 `submissions.py`, and `util.py`) define the complete agent behavior. The native
 runner and Docker image provide the public CyberGym integration around it.
 
+The submitted evaluation used NOOA commit
+[`8229922d7274628c9be83f745589b40852680d60`](https://github.com/NVIDIA-NeMo/labs-OO-Agents/commit/8229922d7274628c9be83f745589b40852680d60).
+The example pins that exact revision in `pyproject.toml`. The agent image also
+exports runtime dependencies from that revision's own `uv.lock` before installing
+NOOA from the full Git commit, preserving the framework and dependency versions
+used by the evaluation.
+
 Each step is a small script under [`scripts/`](scripts/). Read
 [`scripts/config.sh`](scripts/config.sh) to see (and override) every path, model,
 and server setting; the other scripts source it.
@@ -71,9 +78,9 @@ scripts/setup.sh
 
 This creates a uv virtualenv, generates a local CyberGym API key in `.env`,
 installs and clones CyberGym, fetches the subset via Git LFS, pulls the matching
-Docker images, installs the runner, and builds the agent image. The image installs
-NOOA directly from the current repository checkout, preventing the framework and
-agent revisions from silently drifting apart. The script is safe to re-run.
+Docker images, installs the runner from this example's frozen `uv.lock`, and
+builds the agent image with the evaluated NOOA revision. The script is safe to
+re-run.
 
 The subset it installs:
 

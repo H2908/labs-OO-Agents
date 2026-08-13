@@ -10,7 +10,6 @@
 # Root of this example (the directory that contains this scripts/ folder).
 AGENT_REPO="${AGENT_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 export AGENT_REPO
-export FRAMEWORK_REPO="${FRAMEWORK_REPO:-$(cd "$AGENT_REPO/../.." && pwd)}"
 
 # CyberGym benchmark checkout + data (created by scripts/setup.sh).
 export CYBERGYM_REPO="${CYBERGYM_REPO:-$AGENT_REPO/cybergym_repo}"
@@ -44,7 +43,7 @@ export RUNNER_IMAGE="${RUNNER_IMAGE:-nooa/nooa-cybergym:latest}"
 # 13920s / 3h52m) so the agent can return its best PoC gracefully before the kill.
 export TIMEOUT="${TIMEOUT:-14400}"  # 4h
 
-# Python virtualenv used for all host-side commands.
+# Python virtualenv managed from this example's frozen uv lockfile.
 export VENV="${VENV:-$AGENT_REPO/.venv}"
 
 # The official CyberGym 10-task subset used by this example.

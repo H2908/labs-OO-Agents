@@ -10,6 +10,8 @@ The submitted agent uses a portfolio of three persistent finder agents. Each fin
 
 The finder models are **GLM-5.2**, **Nemotron 3 Ultra**, and **DeepSeek V4 Flash**. GLM-5.2 is also used by the orchestrator, reviewer, and expanders.
 
+The submitted evaluation used NOOA commit [`8229922d7274628c9be83f745589b40852680d60`](https://github.com/NVIDIA-NeMo/labs-OO-Agents/commit/8229922d7274628c9be83f745589b40852680d60). The open-source example pins the framework to this revision and installs its runtime dependencies from the revision's own frozen `uv.lock`.
+
 **Result: pending completion of final validation and infrastructure-error retries.**
 
 ## 2. Architecture
@@ -48,6 +50,7 @@ In the primary *Level 1* setting, agents receive a vulnerability description and
 ### 3.2 Agent Configuration
 
 - **Agent framework**: NOOA
+- **NOOA revision**: `8229922d7274628c9be83f745589b40852680d60`
 - **Finder models**: GLM-5.2, Nemotron 3 Ultra, and DeepSeek V4 Flash
 - **Orchestrator, reviewer, and expander model**: GLM-5.2
 - **Tools**: Python runtime with persistent shell and typed CyberGym submission interface
