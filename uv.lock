@@ -1465,7 +1465,6 @@ dev = [
     { name = "pyright", specifier = ">=1.1.408" },
     { name = "pytest", specifier = ">=7.4.0" },
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
-    { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-rerunfailures", specifier = ">=14.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
