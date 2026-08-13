@@ -272,10 +272,12 @@ disable_error_code = ["empty-body", "return", "call-arg"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+force-exclude = true
 extend-exclude = [
     "worktrees",
     ".vscode-server",
     ".claude",
+    "notebook_tutorials",
     "examples/arc_agi_3/arc_agi_3",
     "examples/cybergym/task_artifacts",
 ]
