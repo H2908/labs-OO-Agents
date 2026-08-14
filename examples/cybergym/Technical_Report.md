@@ -96,22 +96,25 @@ The token, cost, and timing figures below are per-trial averages over the valid 
 | Tasks attempted              | 1,507      | All unique CyberGym Level 1 tasks, using only the latest attempt.          |
 | Tasks succeeded              | 1,286      | Reward 1 with no trial exception.                                          |
 | Tasks failed                 | 221        | Reward 0, missing reward, or a trial exception.                            |
-| Input tokens                 | 11,434,221 | Average non-cached prompt tokens per attempt.                              |
-| Cache read tokens            | 53,169,469 | Average cached prompt tokens per attempt.                                  |
-| Output tokens                | 573,441    | Average generated tokens per attempt.                                      |
-| Provider-reported cost (USD) | $4.60      | Average per attempt; Nemotron usage was not priced.                        |
+| Input tokens                 | 11,419,670 | Average non-cached prompt tokens per attempt.                              |
+| Cache read tokens            | 53,072,411 | Average cached prompt tokens per attempt.                                  |
+| Output tokens                | 572,423    | Average generated tokens per attempt.                                      |
+| Provider-reported cost (USD) | $4.59      | Average per attempt; Nemotron usage was not priced.                        |
 | Wall-clock time (min)        | 58         | Average start-to-finish time, including setup and verification.            |
-| LLM requests                 | 765.1      | Average completed NOOA journal call records per attempt.                   |
+| LLM requests                 | 764.2      | Average completed NOOA journal call records per attempt.                   |
 
 The provider-reported cost is incomplete and must not be interpreted as the full average cost of an attempt: GLM-5.2 and DeepSeek returned positive billing telemetry, while Nemotron returned token counts but no cost.
 
-#### Per-model usage
+#### Per-model breakdown
 
-| Model | Input tokens | Cache read tokens | Output tokens | LLM requests |
-|---|---:|---:|---:|---:|
-| `nvidia/deepseek-ai/deepseek-v4-flash` | 1,610,922 | 11,474,295 | 210,060 | 153.7 |
-| `nvidia/nvidia/nemotron-3-ultra` | 7,912,526 | 14,961,000 | 129,920 | 223.9 |
-| `nvidia/zai-org/glm-5.2` | 1,910,605 | 26,731,425 | 233,550 | 387.5 |
+| Model | Input tokens | Cache read tokens | Output tokens | LLM requests | time_cost_sec | Cost/trial | Total cost |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `nvidia/deepseek-ai/deepseek-v4-flash` | 1,606,399 | 11,454,139 | 209,427 | 153.6 | 2,466.1 | $0.4585 | $691.00 |
+| `nvidia/nvidia/nemotron-3-ultra` | 7,905,902 | 14,934,723 | 129,740 | 223.7 | 2,637.0 | $0.0000 | $0.00 |
+| `nvidia/zai-org/glm-5.2` | 1,907,192 | 26,680,962 | 233,346 | 386.9 | 4,101.3 | $4.1312 | $6,225.73 |
+| `result.json` minus completed journal calls | 177 | 2,587 | -90 | — | — | $0.0003 | $0.51 |
+
+The final row is the small reconciliation delta between `result.json` token accounting and completed journal calls. `time_cost_sec` is cumulative Finder, Expander, and Reviewer lifecycle time, so concurrently running agents count separately.
 
 ### Comparisons
 
@@ -146,4 +149,4 @@ The PoC submissions and accompanying artifacts (trajectories, logs, results) sha
 
 ## 6. Conclusions
 
-On CyberGym Level 1, the NOOA CyberGym agent solves 1,286 of 1,507 tasks (85.3% pass@1), which would place ninth among the comparison results listed above. It reaches this level with no cybersecurity domain knowledge, exploit templates, or benchmark-specific hints, only a generic vulnerability-validation workflow expressed as an object-oriented NOOA multi-agent system. The result is therefore attributable to the agent architecture and underlying models rather than task-specific engineering, and it shows that a fully open-source agent with open-weight models can compete with proprietary systems on realistic security tasks. The approach is computationally intensive: an average attempt used 765 model calls and more than 64 million prompt tokens including cache reads.
+On CyberGym Level 1, the NOOA CyberGym agent solves 1,286 of 1,507 tasks (85.3% pass@1), which would place ninth among the comparison results listed above. It reaches this level with no cybersecurity domain knowledge, exploit templates, or benchmark-specific hints, only a generic vulnerability-validation workflow expressed as an object-oriented NOOA multi-agent system. The result is therefore attributable to the agent architecture and underlying models rather than task-specific engineering, and it shows that a fully open-source agent with open-weight models can compete with proprietary systems on realistic security tasks. The approach is computationally intensive: an average attempt used 764 model calls and more than 64 million prompt tokens including cache reads.
