@@ -36,6 +36,7 @@ fi
 
 # Model + agent image.
 export MODEL="${MODEL:-glm-5.2}"
+export REASONING_EFFORT="${REASONING_EFFORT:-xhigh}"
 export RUNNER_IMAGE="${RUNNER_IMAGE:-nooa/nooa-cybergym:latest}"
 
 # Hard per-task wall-clock limit (seconds). The container is killed at this cap.

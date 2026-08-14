@@ -10,8 +10,6 @@ The submitted agent uses a portfolio of three persistent finder agents. Each fin
 
 The finder models are **GLM-5.2**, **Nemotron 3 Ultra**, and **DeepSeek V4 Flash**. GLM-5.2 is also used by the orchestrator, reviewer, and expanders.
 
-The submitted evaluation used NOOA commit [`8229922d7274628c9be83f745589b40852680d60`](https://github.com/NVIDIA-NeMo/labs-OO-Agents/commit/8229922d7274628c9be83f745589b40852680d60). The open-source example pins the framework to this revision and installs its runtime dependencies from the revision's own frozen `uv.lock`.
-
 **Result: 1,286 / 1,507 tasks solved = 85.3% pass@1.**
 
 ## 2. Architecture
@@ -27,7 +25,7 @@ The design unifies six model-facing ideas: typed input/output, pass by reference
 
 ### 2.2 NOOA CyberGym Agent
 
-The NOOA CyberGym agent runs inside each trial container as a portfolio-style multi-agent system. Three persistent finder lanes independently inspect the vulnerability description, pre-patch source tree, input harness, and build metadata. Each finder can use a persistent shell and submit candidate input files through a typed submission method.
+The NOOA CyberGym agent runs inside each trial container as a portfolio-style multi-agent system. Three persistent finder lanes independently inspect the vulnerability description, pre-patch source tree, input harness, and build metadata. Both finders and expanders use NOOA's CodeAct strategy with a Python runtime, a persistent shell, and a typed method for submitting candidate input files.
 
 The submission manager keeps benchmark mechanics out of model prompts. It invokes the CyberGym submission interface, classifies verifier output, fingerprints sanitizer crashes and fatal signals, and records each candidate together with the finder's trigger hypothesis. The shared portfolio exposes only distinct verified crash families and reviewer guidance to the workers.
 
@@ -53,10 +51,13 @@ In the primary *Level 1* setting, agents receive a vulnerability description and
 * **NOOA revision**: `8229922d7274628c9be83f745589b40852680d60`
 * **Finder models**: GLM-5.2, Nemotron 3 Ultra, and DeepSeek V4 Flash
 * **Orchestrator, reviewer, and expander model**: GLM-5.2
+* **Reasoning effort**: `xhigh`
 * **Tools**: Python runtime with persistent shell and typed CyberGym submission interface
 * **Minimum exploration time**: 1,200 s
 * **Maximum concurrent expanders**: 2
 * **Soft timeout**: 13,920 s (~3.87 h), returns the best verified portfolio found so far
+
+The submitted evaluation used NOOA commit [`8229922d7274628c9be83f745589b40852680d60`](https://github.com/NVIDIA-NeMo/labs-OO-Agents/commit/8229922d7274628c9be83f745589b40852680d60). The open-source example pins the framework to this revision and installs its runtime dependencies from the revision's own frozen `uv.lock`.
 
 ### 3.3 Access to Vulnerable vs. Patched Builds
 
@@ -65,8 +66,6 @@ The agent is provided only the pre-patch (vulnerable) program (`repo-vul.tar.gz`
 ### 3.4 Pass@1
 
 Tasks were run only once. Only infrastructure failures triggered a retry, specifically when the agent returned a non-zero exit code due to crashes caused by API issues, Docker failures, or out-of-memory kills. Each attempt was capped at 4 hours of agent wall-clock time.
-
-The aggregate was computed from the base run and retry batches 1–6 by selecting the highest-numbered attempt for each of the 1,507 unique tasks. The selected attempts came from the base run for 1,284 tasks, retry 1 for 138, retry 2 for 27, retry 3 for 22, retry 4 for 8, retry 5 for 5, and retry 6 for 23. Success means reward 1 with no trial exception; reward 0, a missing reward, or any trial exception counts as failure.
 
 ### 3.5 Network Isolation
 
@@ -83,13 +82,13 @@ An agent can submit many PoCs while working a task, so a task's success can be c
 
 ### 3.7 Dynamic Analysis Setup
 
-Agents did not have direct access to the vulnerable or fixed binaries. The agent had shell access to its own task container, including `/workspace/task_data/` and a typed wrapper around `/workspace/submit.sh`. Submissions were sent to a task-server sidecar, which ran the PoC on the vulnerable binary and returned sanitizer feedback. The fixed binary and reference PoC were not exposed to the agent and were used only by the verifier/scoring path. The agent could write and execute helper code in its container and submit arbitrarily many PoCs, but it could not inspect or directly execute the hidden vulnerable/fixed binaries, read `/tmp/poc`, or access git history.
+Agents did not have direct access to the vulnerable or fixed binaries. The agent had shell access to its own task container, including `/workspace/task_data/` and a `submit()` wrapper around `/workspace/submit.sh`. Submissions were sent to a task-server sidecar, which ran the PoC on the vulnerable binary and returned sanitizer feedback. The fixed binary and reference PoC were not exposed to the agent and were used only by the verifier/scoring path. The agent could write and execute helper code in its container and submit arbitrarily many PoCs, but it could not inspect or directly execute the hidden vulnerable/fixed binaries, read `/tmp/poc`, or access git history.
 
 ## 4. Results
 
 ### Metrics
 
-The token, cost, timing, and request figures below are per-attempt averages over all 1,507 selected attempts, including failures. No selected attempt was excluded for missing usage metrics. The full extracted accounting is available in [the submission metrics](cybergym-full-oo-next-glm52-journal-20260810-submission-metrics.md).
+The token, cost, and timing figures below are per-trial averages over the valid trials.
 
 | Metric                       | Value      | Comment                                                                    |
 |------------------------------|------------|----------------------------------------------------------------------------|
@@ -113,8 +112,6 @@ The provider-reported cost is incomplete and must not be interpreted as the full
 | `nvidia/deepseek-ai/deepseek-v4-flash` | 1,610,922 | 11,474,295 | 210,060 | 153.7 |
 | `nvidia/nvidia/nemotron-3-ultra` | 7,912,526 | 14,961,000 | 129,920 | 223.9 |
 | `nvidia/zai-org/glm-5.2` | 1,910,605 | 26,731,425 | 233,550 | 387.5 |
-
-Small reconciliation differences between the model rows and `result.json` arise from averaging and journal-call accounting; they are documented in the submission metrics file.
 
 ### Comparisons
 
@@ -140,13 +137,12 @@ This work is not yet an official leaderboard row. The placement above uses the l
 | Item                                     | Link                                                               |
 |------------------------------------------|--------------------------------------------------------------------|
 | NOOA CyberGym agent code                 | [Link](nooa_cybergym/agent.py)                                     |
-| Full-run aggregate and per-model metrics | [Link](cybergym-full-oo-next-glm52-journal-20260810-submission-metrics.md) |
 | ATIF trajectories                        | [Link](task_artifacts) (`trajectory.json` files)                    |
 | Logs                                     | [Link](task_artifacts) (`output.txt` files)                         |
 | PoC submissions                          | [Link](task_artifacts) (`submissions.zip` archives)                 |
 | Verifier results                         | [Link](task_artifacts) (`result.txt` files)                         |
 
-The PoC submissions and accompanying artifacts (trajectories, logs, results) shared here come from a separate run over 10 tasks, not from the run submitted to the leaderboard. This run used the exact same agent code. We re-ran these tasks manually because the original PoC submissions were discarded. All 10 tasks pass differential verification.
+The PoC submissions and accompanying artifacts (trajectories, logs, results) shared here come from a separate run over 10 tasks, not from the run submitted to the leaderboard. This run used the exact same agent code. We re-ran these tasks manually because the original PoC submissions were discarded.
 
 ## 6. Conclusions
 

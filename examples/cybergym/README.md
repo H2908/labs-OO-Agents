@@ -35,12 +35,10 @@ agent solved 1,286 tasks (85.3% pass@1). The aggregate selects only the
 highest-numbered attempt for each task across the base run and infrastructure
 retry batches, so every task contributes one result.
 
-The [submission metrics](cybergym-full-oo-next-glm52-journal-20260810-submission-metrics.md)
-contain the complete aggregate and per-model usage breakdown. Headline
-per-attempt averages were 11,434,221 non-cached input tokens, 53,169,469 cache
-read tokens, 573,441 output tokens, 765.1 model requests, and 58 minutes of
-wall-clock time. The reported $4.60 average cost is incomplete provider
-telemetry because Nemotron usage was not priced.
+Headline per-attempt averages were 11,434,221 non-cached input tokens,
+53,169,469 cache read tokens, 573,441 output tokens, 765.1 model requests, and
+58 minutes of wall-clock time. The reported $4.60 average cost is incomplete
+provider telemetry because Nemotron usage was not priced.
 
 The [`task_artifacts/`](task_artifacts) directory provides a separate 10-task
 evidence set with ATIF trajectories, logs, verifier results, and PoC submissions
@@ -68,7 +66,8 @@ OPENAI_BASE_URL=https://your-openai-compatible-gateway.example/v1
 
 Configure the models available through your LLM provider in
 [`nooa_cybergym/llm_config.yaml`](nooa_cybergym/llm_config.yaml). Model names and
-providers must be supported by LiteLLM. The aliases referenced by the finder
+providers must be supported by [LiteLLM](https://docs.litellm.ai/docs/providers).
+The aliases referenced by the finder
 lanes in [`agent.py`](nooa_cybergym/agent.py) must match entries in that file.
 
 | Setting | Where to configure it |
@@ -78,6 +77,7 @@ lanes in [`agent.py`](nooa_cybergym/agent.py) must match entries in that file.
 | Finder models | `LANES` in `nooa_cybergym/agent.py` |
 | Orchestrator and reviewer model | `--model` (default: `glm-5.2`) |
 | Expander model | `DEFAULT_MODEL_NAME` in `nooa_cybergym/agent.py` |
+| Reasoning effort | `REASONING_EFFORT` (default: `xhigh`) |
 
 The current plumbing passes one endpoint and credential to every configured
 model. Using provider-specific endpoints or credentials requires adapting the
@@ -185,6 +185,7 @@ source .venv/bin/activate
 python3 -m nooa_cybergym.run \
   --use-firewall \
   --model glm-5.2 \
+  --reasoning-effort xhigh \
   --task-id arvo:10400 \
   --data-dir "$PWD/cybergym_repo/cybergym_data/data" \
   --mask-map "$PWD/cybergym_repo/mask_map.json" \
