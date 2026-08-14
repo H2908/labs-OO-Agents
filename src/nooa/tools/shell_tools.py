@@ -43,12 +43,19 @@ from nooa.tools._results import StreamDone, StreamEvent
 
 
 class FileWrite:
-    """Result of a write/replace operation."""
+    """Result of a write/replace operation.
 
-    def __init__(self, path: str, message: str, diff: str = ""):
+    ``new_text`` is the text as it was actually written, after any
+    normalization the write applied. Observers report from it so what they
+    record matches what landed on disk. It is deliberately left out of
+    ``__str__`` — the agent already knows the text it asked for.
+    """
+
+    def __init__(self, path: str, message: str, diff: str = "", new_text: str = ""):
         self.path = path
         self.message = message
         self.diff = diff
+        self.new_text = new_text
 
     def __str__(self) -> str:
         parts = [self.message]
@@ -143,6 +150,7 @@ class ShellResult(str):
     stdout: str
     stderr: str
     returncode: int
+    timed_out: bool
     success: bool
     matches: list[Match] | None
 
@@ -152,11 +160,13 @@ class ShellResult(str):
         stderr: str = "",
         returncode: int = 0,
         matches: list[Match] | None = None,
+        timed_out: bool = False,
     ):
         obj = super().__new__(cls, stdout)
         obj.stdout = stdout
         obj.stderr = stderr
         obj.returncode = returncode
+        obj.timed_out = timed_out
         obj.success = returncode == 0
         obj.matches = matches
         return obj
@@ -376,7 +386,9 @@ class ShellTools(Skill):
         """
         session = await self._get_session()
         run_cmd = self._with_stdin(command, stdin)
-        stdout, stderr, code, _timed = await session.run_with_timeout_flag(run_cmd, timeout=timeout)
+        stdout, stderr, code, timed_out = await session.run_with_timeout_flag(
+            run_cmd, timeout=timeout
+        )
         # Track cwd changes for read/replace/write_file path resolution
         pwd_out, _, _, _ = await session.run_with_timeout_flag("pwd", timeout=5.0)
         if pwd_out.strip():
@@ -390,13 +402,15 @@ class ShellTools(Skill):
         if matches:
             print(
                 f"# self.shell.run({command!r:.60}) found {len(matches)} match(es).\n"
-                f"# Edit directly: m = <result>.matches[0]; await self.shell.replace(m, new_text)"
+                "# Edit directly: m = <result>.matches[0]; "
+                "await self.shell.replace(m, new_text)"
             )
 
         return ShellResult(
             stdout=stdout,
             stderr=stderr,
             returncode=code,
+            timed_out=timed_out,
             matches=matches,
         )
 
@@ -725,6 +739,7 @@ class ShellTools(Skill):
                 path=target.path,
                 message=f"Edited {target.path} (replaced lines {target.start}-{target.end})",
                 diff=diff,
+                new_text=new_text,
             )
 
         elif isinstance(target, str):
@@ -756,6 +771,7 @@ class ShellTools(Skill):
                 path=target,
                 message=f"Edited {target}",
                 diff=f"--- a/{target}\n+++ b/{target}",
+                new_text=new,
             )
         else:
             raise TypeError(f"target must be a Match or file path str, got {type(target).__name__}")
@@ -779,4 +795,5 @@ class ShellTools(Skill):
         return FileWrite(
             path=path,
             message=f"Created {path} ({line_count} lines)",
+            new_text=content,
         )
