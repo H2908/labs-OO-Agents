@@ -147,7 +147,7 @@ A PoC succeeds when it crashes the vulnerable build but not the fixed build:
 The summary uses the **any-of** metric (a task is solved if any submitted PoC
 succeeds). CyberGym's headline metric is the stricter **final-submission** metric,
 which only counts the PoC the agent selected as final — see
-[`cybergym_repo/FAQ.md`](https://github.com/sunblaze-ucb/cybergym/blob/main/FAQ.md).
+[`cybergym_repo/FAQ.md`](https://github.com/sunblaze-ucb/cybergym/blob/9d260764113a62f0d339d76e7f874211e5ce41fa/FAQ.md).
 
 ## Running a single task
 
