@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+"""Regression tests for the CyberGym agent entry point."""
+
 from __future__ import annotations
 
 import pytest
