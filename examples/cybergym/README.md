@@ -14,37 +14,12 @@ new family. The behavior-defining files (`agent.py`, `main.py`, `shell_tools.py`
 `submissions.py`, and `util.py`) define the complete agent behavior. The native
 runner and Docker image provide the public CyberGym integration around it.
 
-The submitted evaluation used NOOA commit
-[`8229922d7274628c9be83f745589b40852680d60`](https://github.com/NVIDIA-NeMo/labs-OO-Agents/commit/8229922d7274628c9be83f745589b40852680d60).
-The example pins that exact revision in `pyproject.toml`. The agent image also
-exports runtime dependencies from that revision's own `uv.lock` before installing
-NOOA from the full Git commit, preserving the framework and dependency versions
-used by the evaluation.
-
 Each step is a small script under [`scripts/`](scripts/). Read
 [`scripts/config.sh`](scripts/config.sh) to see (and override) every path, model,
 and server setting; the other scripts source it.
 
 See the [technical report](Technical_Report.md) for its architecture, runtime
 boundary, reproducibility design, and verification coverage.
-
-## Evaluation result
-
-On the full 1,507-task CyberGym Level 1 evaluation, the submitted portfolio
-agent solved 1,286 tasks (85.3% pass@1). The aggregate selects only the
-highest-numbered attempt for each task across the base run and infrastructure
-retry batches, so every task contributes one result.
-
-Headline per-attempt averages were 11,434,221 non-cached input tokens,
-53,169,469 cache read tokens, 573,441 output tokens, 765.1 model requests, and
-58 minutes of wall-clock time. The reported $4.60 average cost is incomplete
-provider telemetry because Nemotron usage was not priced.
-
-The [`task_artifacts/`](task_artifacts) directory provides a separate 10-task
-evidence set with ATIF trajectories, logs, verifier results, and PoC submissions
-packaged as `submissions.zip`. All 10 examples pass differential verification.
-This evidence set illustrates agent behavior and is not the source of the
-full-run aggregate.
 
 ## Requirements
 
@@ -56,8 +31,8 @@ full-run aggregate.
 
 The default configuration uses three finder models—GLM-5.2, Nemotron 3 Ultra,
 and DeepSeek V4 Flash—with GLM-5.2 as the orchestrator, reviewer, and expander
-model. The submitted run exposed all three through one OpenAI-compatible gateway.
-To reproduce that setup, put the gateway credential and URL in `.env`:
+model. It exposes all three through one OpenAI-compatible gateway. Put the
+gateway credential and URL in `.env`:
 
 ```bash
 OPENAI_API_KEY=...
@@ -99,7 +74,7 @@ scripts/setup.sh
 This creates a uv virtualenv, generates a local CyberGym API key in `.env`,
 installs and clones CyberGym, fetches the subset via Git LFS, pulls the matching
 Docker images, installs the runner from this example's frozen `uv.lock`, and
-builds the agent image with the evaluated NOOA revision. The script is safe to
+builds the agent image with the pinned NOOA revision. The script is safe to
 re-run.
 
 The subset it installs:
