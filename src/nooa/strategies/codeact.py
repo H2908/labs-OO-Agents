@@ -902,6 +902,14 @@ Standard Python builtins and agent instance (`self`) are available."""
                 # translation. Consider making extensible in the future.
                 if response.finish_reason == "tool_calls" and response.tool_calls:
                     tool_calls = response.tool_calls
+                    assistant_message = getattr(response, "assistant_message", None)
+                    reasoning_items = (
+                        assistant_message.get("reasoning_items")
+                        if isinstance(assistant_message, dict)
+                        else None
+                    )
+                    if not isinstance(reasoning_items, list):
+                        reasoning_items = None
                     # If the LLM also emitted message content alongside the tool
                     # call(s), preserve it by prepending it as a comment at the
                     # top of the first execute_python code block.
@@ -928,6 +936,7 @@ Standard Python builtins and agent instance (`self`) are available."""
                         call,
                         return_type,
                         event_id or "",
+                        reasoning_items=reasoning_items,
                     )
                     if result.completed:
                         turn_state.success = True
@@ -1203,6 +1212,7 @@ Standard Python builtins and agent instance (`self`) are available."""
         call: "CurrentCall",
         return_type: Any,
         event_id: str,
+        reasoning_items: list[dict[str, Any]] | None = None,
     ) -> _ToolCallsResult:
         """Process tool calls from a single LLM turn.
 
@@ -1226,7 +1236,7 @@ Standard Python builtins and agent instance (`self`) are available."""
         # Process each tool call in order, stopping at the first error.
         # If one cell fails, subsequent cells likely depend on its output
         # and would cascade into confusing errors.
-        for tool_call in tool_calls:
+        for tool_call_index, tool_call in enumerate(tool_calls):
             # Parse arguments
             try:
                 args = json.loads(tool_call.arguments)
@@ -1244,6 +1254,7 @@ Standard Python builtins and agent instance (`self`) are available."""
                     tool_call_id=tool_call.id,
                     name=tool_call.name,
                     arguments=args,
+                    reasoning_items=(reasoning_items if tool_call_index == 0 else None),
                     result=None,  # Will be updated after execution
                 )
             )
