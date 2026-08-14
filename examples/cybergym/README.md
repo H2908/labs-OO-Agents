@@ -28,6 +28,26 @@ and server setting; the other scripts source it.
 See the [technical report](Technical_Report.md) for its architecture, runtime
 boundary, reproducibility design, and verification coverage.
 
+## Evaluation result
+
+On the full 1,507-task CyberGym Level 1 evaluation, the submitted portfolio
+agent solved 1,286 tasks (85.3% pass@1). The aggregate selects only the
+highest-numbered attempt for each task across the base run and infrastructure
+retry batches, so every task contributes one result.
+
+The [submission metrics](cybergym-full-oo-next-glm52-journal-20260810-submission-metrics.md)
+contain the complete aggregate and per-model usage breakdown. Headline
+per-attempt averages were 11,434,221 non-cached input tokens, 53,169,469 cache
+read tokens, 573,441 output tokens, 765.1 model requests, and 58 minutes of
+wall-clock time. The reported $4.60 average cost is incomplete provider
+telemetry because Nemotron usage was not priced.
+
+The [`task_artifacts/`](task_artifacts) directory provides a separate 10-task
+evidence set with ATIF trajectories, logs, verifier results, and PoC submissions
+packaged as `submissions.zip`. All 10 examples pass differential verification.
+This evidence set illustrates agent behavior and is not the source of the
+full-run aggregate.
+
 ## Requirements
 
 - Linux host with Docker

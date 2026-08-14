@@ -12,7 +12,7 @@ The finder models are **GLM-5.2**, **Nemotron 3 Ultra**, and **DeepSeek V4 Flash
 
 The submitted evaluation used NOOA commit [`8229922d7274628c9be83f745589b40852680d60`](https://github.com/NVIDIA-NeMo/labs-OO-Agents/commit/8229922d7274628c9be83f745589b40852680d60). The open-source example pins the framework to this revision and installs its runtime dependencies from the revision's own frozen `uv.lock`.
 
-**Result: pending completion of final validation and infrastructure-error retries.**
+**Result: 1,286 / 1,507 tasks solved = 85.3% pass@1.**
 
 ## 2. Architecture
 
@@ -64,7 +64,9 @@ The agent is provided only the pre-patch (vulnerable) program (`repo-vul.tar.gz`
 
 ### 3.4 Pass@1
 
-Tasks are run only once. Only infrastructure failures trigger a retry, specifically when the agent returns a non-zero exit code due to crashes caused by API issues, Docker failures, or out-of-memory kills. Each attempt is capped at 4 hours of agent wall-clock time.
+Each task contributes exactly one result to the reported score. The evaluation policy permits retries only for infrastructure failures, such as API issues, Docker failures, or out-of-memory kills; retries are replacement attempts rather than additional trials. Each attempt is capped at 4 hours of agent wall-clock time.
+
+The aggregate was computed from the base run and retry batches 1–6 by selecting the highest-numbered attempt for each of the 1,507 unique tasks. The selected attempts came from the base run for 1,284 tasks, retry 1 for 138, retry 2 for 27, retry 3 for 22, retry 4 for 8, retry 5 for 5, and retry 6 for 23. Success means reward 1 with no trial exception; reward 0, a missing reward, or any trial exception counts as failure.
 
 ### 3.5 Network Isolation
 
@@ -85,20 +87,67 @@ Agents do not have direct access to the vulnerable or fixed binaries. The agent 
 
 ## 4. Results
 
-Final results will be added after the full run has completed infrastructure-error retries and the submission has passed final validation. Preliminary or incomplete aggregates are intentionally not reported as a leaderboard score.
-
 ### Metrics
 
-The final table will report success rate, attempted/succeeded/failed tasks, per-trial token usage, estimated cost, wall-clock time, and LLM request count over valid trials.
+The token, cost, timing, and request figures below are per-attempt averages over all 1,507 selected attempts, including failures. No selected attempt was excluded for missing usage metrics. The full extracted accounting is available in [the submission metrics](cybergym-full-oo-next-glm52-journal-20260810-submission-metrics.md).
+
+| Metric | Value | Comment |
+|---|---:|---|
+| Success rate | 85.3% | 1,286 successful selected attempts / 1,507 attempted tasks. |
+| Tasks attempted | 1,507 | All unique CyberGym Level 1 tasks, using only the latest attempt. |
+| Tasks succeeded | 1,286 | Reward 1 with no trial exception. |
+| Tasks failed | 221 | Reward 0, missing reward, or a trial exception. |
+| Input tokens | 11,434,221 | Average non-cached prompt tokens per attempt. |
+| Cache read tokens | 53,169,469 | Average cached prompt tokens per attempt. |
+| Output tokens | 573,441 | Average generated tokens per attempt. |
+| Provider-reported cost (USD) | $4.60 | Average available billing telemetry; Nemotron usage was not priced. |
+| Wall-clock time (min) | 58 | Average start-to-finish time, including setup and verification. |
+| LLM requests | 765.1 | Average completed NOOA journal call records per attempt. |
+
+The provider-reported cost is incomplete and must not be interpreted as the full average cost of an attempt: GLM-5.2 and DeepSeek returned positive billing telemetry, while Nemotron returned token counts but no cost.
+
+#### Per-model usage
+
+| Model | Input tokens | Cache read tokens | Output tokens | LLM requests |
+|---|---:|---:|---:|---:|
+| `nvidia/deepseek-ai/deepseek-v4-flash` | 1,610,922 | 11,474,295 | 210,060 | 153.7 |
+| `nvidia/nvidia/nemotron-3-ultra` | 7,912,526 | 14,961,000 | 129,920 | 223.9 |
+| `nvidia/zai-org/glm-5.2` | 1,910,605 | 26,731,425 | 233,550 | 387.5 |
+
+Small reconciliation differences between the model rows and `result.json` arise from averaging and journal-call accounting; they are documented in the submission metrics file.
 
 ### Comparisons
 
-The leaderboard comparison will be refreshed when the final score is available.
+Leading one-trial results from the official [CyberGym Level 1 leaderboard](https://www.cybergym.io/cybergym/), retrieved on 2026-08-14, with this work inserted according to its measured score:
+
+| # | Submission | Model(s) | Score | Date | Source |
+|---:|---|---|---:|---|---|
+| 1 | Sangfor AI | DeepSeek V4 Flash | 93.2% | 2026-08-08 | [Sangfor AI](https://github.com/Sangfor-AI/cybergym-submission-sangfor-ai-v2) |
+| 2 | Whitzard | DeepSeek V4 Flash | 91.2% | 2026-08-07 | [Fudan Whitzard](https://github.com/WhitzardAgent/Whitzard) |
+| 3 | MDASH | GPT-5.4, Claude Opus 4.6, Claude Sonnet 4.6 | 91.0% | 2026-06-17 | [Microsoft](https://www.microsoft.com/en-us/security/blog/2026/06/17/beyond-the-benchmark-advancing-security-at-ai-speed/) |
+| 4 | Wiz Atlas | GPT-5.5, Claude Opus 4.6 | 90.9% | 2026-07-27 | [Wiz](https://www.wiz.io/blog/atlas-ai-vulnerability-researcher) |
+| 5 | DoGNAVY | GLM-5.2 | 90.8% | 2026-08-03 | [DARKNAVY](https://deepsec.darknavy.net/blog/cybergym) |
+| 6 | Crystalline | Claude Opus 4.6 | 89.6% | 2026-06-08 | [Independent researcher](https://github.com/synchopate/cybergym-logos) |
+| 7 | GPT-5.5-Cyber | GPT-5.5-Cyber | 85.6% | 2026-06-22 | [OpenAI](https://openai.com/index/daybreak-securing-the-world/) |
+| 8 | Velldepth Agent | XekRung | 85.3% | 2026-08-03 | [Alibaba Security](https://alibaba-velldepth.github.io/writeups/) |
+| 9 | **NOOA CyberGym** | **GLM-5.2, Nemotron 3 Ultra, DeepSeek V4 Flash** | **85.3%** | **2026-08-10** | **This work** |
+| 10 | Xuanwu Atuin AI | GLM-5.2 | 84.8% | 2026-07-22 | [Tencent Xuanwu Lab](https://xlab.tencent.com/en/2026/07/17/xuanwu-atuin-cybergym-glm52/) |
+
+This work is not yet an official leaderboard row. The placement above uses the leaderboard's stored scores before display rounding: Velldepth is 85.340%, while this work is 1,286 / 1,507 = 85.335%; both display as 85.3%. CyberGym notes that runs are stochastic and modest score differences may not reflect meaningful capability gaps.
 
 ## 5. Artifacts
 
-The open-source agent implementation is available in [nooa_cybergym](nooa_cybergym). Artifacts for the submitted run will be linked after final validation; the complete leaderboard-submission dataset is not included here.
+| Item | Link |
+|---|---|
+| NOOA CyberGym agent code | [nooa_cybergym](nooa_cybergym) |
+| Full-run aggregate and per-model metrics | [Submission metrics](cybergym-full-oo-next-glm52-journal-20260810-submission-metrics.md) |
+| ATIF trajectories | [task_artifacts](task_artifacts) (`trajectory.json` files) |
+| Logs | [task_artifacts](task_artifacts) (`output.txt` files) |
+| PoC submissions | [task_artifacts](task_artifacts) (`submissions.zip` archives) |
+| Verifier results | [task_artifacts](task_artifacts) (`result.txt` files) |
+
+The repository contains a separate evidence set for 10 tasks, all of which pass differential verification. These task artifacts illustrate the agent's behavior and output format; they are not the complete 1,507-task evaluation dataset and are not the source of the aggregate score.
 
 ## 6. Conclusions
 
-Conclusions will be added after final validation of the submitted run.
+On CyberGym Level 1, the NOOA CyberGym portfolio agent solves 1,286 of 1,507 tasks (85.3% pass@1), which would place ninth in the one-trial leaderboard snapshot above. It achieves this with three complementary persistent finder models, shared crash-family feedback, reviewer-guided exploration, and bounded expansion, without task-specific exploit templates or benchmark hints. The result shows that a fully open-source, object-oriented multi-agent harness can perform strongly on realistic vulnerability reproduction, while the usage data also shows that this approach is computationally intensive: an average attempt used 765 model calls and more than 64 million prompt tokens including cache reads.
