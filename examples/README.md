@@ -567,7 +567,7 @@ class DataAgent(Agent, llm=llm):
 
 ### LLM cascading resolution
 
-Configure LLMs at any granularity — class default, method override, instance override — for cost/latency optimization, A/B testing, or gradual rollouts.
+Configure LLMs at any granularity — class default, method override, instance override, or per-call override — for cost/latency optimization, A/B testing, or gradual rollouts.
 
 ```python
 class MyAgent(Agent, llm=default_llm):              # 1. class default
