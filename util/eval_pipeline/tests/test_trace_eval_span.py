@@ -26,7 +26,7 @@ def _read_first_span_from_otlp_file(trace_file: Path) -> tuple[str, dict]:
 
 def test_post_eval_span_applies_viewer_auth(monkeypatch: pytest.MonkeyPatch):
     """Remote eval-span posts include the configured viewer bearer token."""
-    captured: dict[str, str | None] = {}
+    captured: dict[str, object] = {}
 
     class Response:
         status = 200
@@ -39,7 +39,7 @@ def test_post_eval_span_applies_viewer_auth(monkeypatch: pytest.MonkeyPatch):
 
     def fake_urlopen(request, timeout):
         captured["authorization"] = request.get_header("Authorization")
-        captured["timeout"] = str(timeout)
+        captured["timeout"] = timeout
         return Response()
 
     monkeypatch.setenv("NOOA_VIEWER_AUTH_TOKEN", "viewer-secret")
@@ -57,7 +57,7 @@ def test_post_eval_span_applies_viewer_auth(monkeypatch: pytest.MonkeyPatch):
         scores={},
         endpoint="http://viewer.example/v1/traces",
     )
-    assert captured == {"authorization": "Bearer viewer-secret", "timeout": "5"}
+    assert captured == {"authorization": "Bearer viewer-secret", "timeout": 5}
 
 
 class TestWriteEvalSpanToTrace:
