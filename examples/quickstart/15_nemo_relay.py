@@ -5,7 +5,7 @@
 
 NeMo Relay is a multi-language agent runtime that adds execution scope
 management, lifecycle events, and a configurable middleware pipeline
-(guardrails/intercepts) to every LLM call and tool execution in NVIDIA OO Agents.
+(guardrails/intercepts) to every LLM call and tool execution in NOOA.
 It is wired in through ``event_manager.intercept()``.
 
 This example shows how to:
@@ -17,7 +17,7 @@ This example shows how to:
   6. Demonstrate how different return types appear in the NeMo Relay pipeline and ATIF
 
 Prerequisites:
-  Install NVIDIA OO Agents with the nemo-relay extra (public PyPI wheels):
+  Install NOOA with the nemo-relay extra (public PyPI wheels):
 
     uv sync --extra nemo-relay
 
@@ -132,7 +132,7 @@ class ReturnTypeDemoAgent(Agent, llm=llm):
         ...
 
     async def return_pydantic(self) -> Summary:
-        """Return a Summary about NVIDIA OO Agents with title 'NVIDIA OO Agents' and 2 short key points."""
+        """Return a Summary about NOOA with title 'NOOA' and 2 short key points."""
         ...
 
     async def return_string(self) -> str:

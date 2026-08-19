@@ -15,8 +15,8 @@ class TranslatorAgent(Agent, llm=llm):
     def __init__(self, target_language: str = "Spanish", **kwargs):
         super().__init__(**kwargs)
         self.target_language = target_language
-        self.translation_count = 0
 
+    @strategy(PredictStrategy())
     async def translate(self, text: str) -> str:
         """Translate the text to {self.target_language}.
 
@@ -24,6 +24,7 @@ class TranslatorAgent(Agent, llm=llm):
         """
         ...
 
+    @strategy(PredictStrategy())
     async def translate_formal(self, text: str) -> str:
         """Translate the text to {self.target_language} using formal register.
 

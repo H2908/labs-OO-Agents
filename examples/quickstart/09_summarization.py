@@ -19,6 +19,7 @@ class InterviewAgent(Agent, llm=llm):
         super().__init__(**kwargs)
         spec(self, "events", hidden=False)  # Expose event querying
 
+    @strategy(PredictStrategy())
     async def ask(self, candidate_answer: str) -> str:
         """Continue the technical interview based on the candidate's latest answer.
 
@@ -27,6 +28,7 @@ class InterviewAgent(Agent, llm=llm):
         """
         ...
 
+    @strategy(PredictStrategy())
     async def evaluate(self) -> str:
         """Based on the full interview so far, provide a brief candidate evaluation."""
         ...
@@ -48,10 +50,16 @@ async def main():
     agent = InterviewAgent()
     TokenBudgetSummarizer.install(agent, config=TokenBudgetConfig(max_tokens=1000))
 
+    print("  Turn    Active events")
     for i, answer in enumerate(ANSWERS, 1):
         await agent.ask(answer)
         n = len(agent.events.query())
-        print(f"  {i:<6}  {n:>14}")
+        print(f"  {i:<7} {n:>13}")
 
     evaluation = await agent.evaluate()
+    summaries = len(agent.events.query(type="Summary"))
+    print(
+        f"\nAfter automatic summarization: {len(agent.events.query())} active events, "
+        f"{summaries} summary event(s)"
+    )
     print(f"\nEvaluation: {evaluation}")
