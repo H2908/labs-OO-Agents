@@ -64,6 +64,7 @@ REPORT_PATH = REPO / "tmp" / "release-check" / "capability-report.md"
 GITHUB_REPO = "NVIDIA-NeMo/labs-OO-Agents"
 TAG_RE = re.compile(r"^v(?P<version>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+PR_REF_RE = re.compile(r"^refs/pull/[1-9]\d*/head$")
 
 # CI bounds are deliberately explicit. The eval runner checkpoints every
 # completed result to JSONL, so an overall timeout still leaves useful evidence.
@@ -179,6 +180,12 @@ def validate_candidate_sha(sha: str) -> str:
     return sha
 
 
+def validate_candidate_ref(ref: str) -> str:
+    if not PR_REF_RE.fullmatch(ref):
+        die("candidate ref must be a canonical refs/pull/<number>/head ref")
+    return ref
+
+
 def validate_https_url(value: str, label: str) -> str:
     if not re.fullmatch(r"https://[A-Za-z0-9.-]+/[^\s]+", value) or "@" in value:
         die(f"{label} must be an HTTPS URL without embedded credentials")
@@ -292,6 +299,7 @@ def preflight(
     *,
     candidate_sha: str | None = None,
     ci: bool = False,
+    allow_unmerged_candidate: bool = False,
 ) -> tuple[str, str, str, dict[str, Any] | None]:
     """Validate repo state. Returns (head_sha, previous_version_tag)."""
     step(f"Preflight for {tag}")
@@ -328,12 +336,18 @@ def preflight(
         exists = run(["git", "cat-file", "-e", f"{candidate_sha}^{{commit}}"], check=False)
         if exists.returncode != 0:
             die(f"candidate {candidate_sha} does not exist in the fetched public repository")
-        reachable = run(["git", "merge-base", "--is-ancestor", candidate_sha, remote], check=False)
-        if reachable.returncode != 0:
-            die(f"candidate {candidate_sha} is not reachable from GitHub main ({remote})")
-        ok(f"frozen candidate is reachable from current GitHub main ({remote[:12]})")
-        existing_release = validate_existing_release(tag, candidate_sha)
-        ok(f"{tag} has a matching reusable draft" if existing_release else f"{tag} is unused")
+        if allow_unmerged_candidate:
+            existing_release = None
+            ok(f"frozen unmerged rehearsal candidate: {candidate_sha[:12]}")
+        else:
+            reachable = run(
+                ["git", "merge-base", "--is-ancestor", candidate_sha, remote], check=False
+            )
+            if reachable.returncode != 0:
+                die(f"candidate {candidate_sha} is not reachable from GitHub main ({remote})")
+            ok(f"frozen candidate is reachable from current GitHub main ({remote[:12]})")
+            existing_release = validate_existing_release(tag, candidate_sha)
+            ok(f"{tag} has a matching reusable draft" if existing_release else f"{tag} is unused")
     else:
         if head != remote:
             die("HEAD differs from origin/main — push or pull first")
@@ -1403,6 +1417,11 @@ def _parser() -> argparse.ArgumentParser:
         help="strict, noninteractive CI mode (never discovers ambient extras or copies .env)",
     )
     parser.add_argument("--candidate-sha", help="exact 40-character public candidate SHA")
+    parser.add_argument(
+        "--candidate-ref",
+        default="",
+        help="canonical refs/pull/<number>/head ref authenticated by the private controller",
+    )
     parser.add_argument("--internal-wheel", type=Path, help="explicit internal model-alias wheel")
     parser.add_argument("--controller-sha", help="exact nooa-dev commit that built the wheel")
     parser.add_argument("--artifact-dir", type=Path, help="private CI evidence output directory")
@@ -1474,9 +1493,25 @@ def ci_main(args: argparse.Namespace) -> int:
         die("--internal-wheel must be the nemo-oo-agents-nvidia wheel")
     if args.artifact_dir is None:
         die("--ci requires --artifact-dir")
+    candidate_ref = validate_candidate_ref(args.candidate_ref) if args.candidate_ref else None
+    unmerged_candidate = candidate_ref is not None
+    models = args.models.split(",") if args.models else GATE_MODELS
+    if any(not model.strip() for model in models):
+        die("--models contains an empty alias")
+    rehearsal = bool(args.limit) or args.runs != GATE_RUNS or models != GATE_MODELS
+    if args.runs < 1 or (args.limit is not None and args.limit < 1):
+        die("--runs and --limit must be positive")
+    if rehearsal and args.create_draft:
+        die("a reduced rehearsal can never create a draft")
+    if unmerged_candidate and not rehearsal:
+        die("--candidate-ref requires a reduced rehearsal")
+    if unmerged_candidate and args.create_draft:
+        die("an unmerged candidate can never create a draft")
+    if args.checks_only and args.create_draft:
+        die("--checks-only can never be combined with --create-draft")
     if not os.getenv("NVIDIA_INTERNAL_API_KEY"):
         die("NVIDIA_INTERNAL_API_KEY is required for the live capability gate")
-    if not os.getenv("GH_TOKEN"):
+    if not unmerged_candidate and not os.getenv("GH_TOKEN"):
         die("GH_TOKEN is required in CI to inspect and reconcile release state")
     validate_https_url(args.pipeline_url, "pipeline URL")
     validate_https_url(args.job_url, "job URL")
@@ -1499,6 +1534,10 @@ def ci_main(args: argparse.Namespace) -> int:
             "status": "running",
             "requested_version": args.tag,
             "candidate_sha": candidate_sha,
+            "candidate_ref": candidate_ref,
+            "candidate_source": (
+                "canonical_github_pull_ref" if unmerged_candidate else "github_main"
+            ),
             "nooa_dev_sha": controller_sha,
             "internal_model_wheel": {
                 "filename": internal_wheel.name,
@@ -1515,19 +1554,12 @@ def ci_main(args: argparse.Namespace) -> int:
     manifest.write()
     try:
         manifest.update(environment=tool_versions(args.image_digest))
-        models = args.models.split(",") if args.models else GATE_MODELS
-        if any(not model.strip() for model in models):
-            die("--models contains an empty alias")
-        rehearsal = bool(args.limit) or args.runs != GATE_RUNS or models != GATE_MODELS
-        if args.runs < 1 or (args.limit is not None and args.limit < 1):
-            die("--runs and --limit must be positive")
-        if rehearsal and args.create_draft:
-            die("a reduced rehearsal can never create a draft")
-        if args.checks_only and args.create_draft:
-            die("--checks-only can never be combined with --create-draft")
-
         head_sha, prev_tag, prev_sha, existing = preflight(
-            args.tag, False, candidate_sha=candidate_sha, ci=True
+            args.tag,
+            False,
+            candidate_sha=candidate_sha,
+            ci=True,
+            allow_unmerged_candidate=unmerged_candidate,
         )
         manifest.update(
             previous_release_tag=prev_tag,
@@ -1621,7 +1653,11 @@ def ci_main(args: argparse.Namespace) -> int:
             )
         else:
             warn("checks-only CI run complete; GitHub draft creation was disabled")
-        manifest.update(status="passed", rehearsal=rehearsal)
+        manifest.update(
+            status="passed",
+            rehearsal=rehearsal,
+            unmerged_candidate=unmerged_candidate,
+        )
         _write_job_summary(artifact_dir, manifest)
         return 0
     except ReleaseError as exc:
@@ -1632,7 +1668,13 @@ def ci_main(args: argparse.Namespace) -> int:
 
 
 def local_main(args: argparse.Namespace) -> int:
-    if args.create_draft or args.candidate_sha or args.internal_wheel or args.artifact_dir:
+    if (
+        args.create_draft
+        or args.candidate_sha
+        or args.candidate_ref
+        or args.internal_wheel
+        or args.artifact_dir
+    ):
         die("CI-only arguments require --ci")
 
     models = args.models.split(",") if args.models else GATE_MODELS

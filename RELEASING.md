@@ -80,6 +80,13 @@ setup and reporting cheaply; rehearsals can never create a draft. Before first
 production use, run the complete gate once with draft creation disabled and
 review all artifacts.
 
+Before requesting review of coordinated release-process changes, the private
+controller may run an unmerged rehearsal against a canonical GitHub
+`refs/pull/<number>/head` ref and its exact SHA. That mode may relax only the
+candidate's reachability from GitHub `main`; it remains reduced-scope, requires
+the private controller to authenticate the pull ref, runs every deterministic,
+containment, build, smoke, and evidence check, and can never create a draft.
+
 ## Publication rehearsal and artifact promotion
 
 A manual run of `publish.yml` always targets TestPyPI and is the safe way to

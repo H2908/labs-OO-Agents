@@ -269,6 +269,15 @@ def test_exact_sha_validation(mr):
             mr.validate_candidate_sha(invalid)
 
 
+@pytest.mark.parametrize(
+    "candidate_ref",
+    ["refs/heads/topic", "refs/pull/0/head", "refs/pull/163/merge", "refs/pull/1/head:evil"],
+)
+def test_candidate_ref_validation_is_limited_to_pull_heads(mr, candidate_ref):
+    with pytest.raises(mr.ReleaseError):
+        mr.validate_candidate_ref(candidate_ref)
+
+
 def test_ci_candidate_remains_valid_when_main_advances(mr, monkeypatch):
     candidate = "1" * 40
     advanced_main = "2" * 40
@@ -303,6 +312,53 @@ def test_ci_candidate_remains_valid_when_main_advances(mr, monkeypatch):
 
     assert head == candidate
     assert ["git", "merge-base", "--is-ancestor", candidate, advanced_main] in commands
+
+
+def test_ci_unmerged_rehearsal_skips_only_main_reachability(mr, monkeypatch):
+    candidate = "1" * 40
+    advanced_main = "2" * 40
+    previous = "3" * 40
+
+    def fake_git(*args, **_kwargs):
+        if args == ("rev-parse", "--abbrev-ref", "HEAD"):
+            return "HEAD"
+        if args == ("status", "--porcelain"):
+            return ""
+        if args == ("rev-parse", "HEAD"):
+            return candidate
+        if args == ("rev-parse", "origin/main"):
+            return advanced_main
+        if args[0] == "describe":
+            return "v0.0.9"
+        if args == ("rev-parse", "v0.0.9^{commit}"):
+            return previous
+        raise AssertionError(args)
+
+    commands = []
+
+    def fake_run(cmd, **_kwargs):
+        commands.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(mr, "git", fake_git)
+    monkeypatch.setattr(mr, "run", fake_run)
+    monkeypatch.setattr(
+        mr,
+        "validate_existing_release",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("release state is production-only")),
+    )
+
+    head, _tag, _prev, existing = mr.preflight(
+        "v0.0.10",
+        False,
+        candidate_sha=candidate,
+        ci=True,
+        allow_unmerged_candidate=True,
+    )
+
+    assert head == candidate
+    assert existing is None
+    assert not any("merge-base" in command for command in commands)
 
 
 def test_existing_release_must_be_matching_unpublished_draft(mr, monkeypatch):
@@ -512,6 +568,45 @@ def _ci_args(mr, tmp_path):
             "--create-draft",
         ]
     )
+
+
+def test_unmerged_candidate_requires_reduced_scope_and_never_drafts(mr, tmp_path, monkeypatch):
+    args = _ci_args(mr, tmp_path)
+    args.candidate_ref = "refs/pull/163/head"
+    args.create_draft = False
+    monkeypatch.setenv("NVIDIA_INTERNAL_API_KEY", "disposable-test-key")
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+
+    with pytest.raises(mr.ReleaseError, match="requires a reduced rehearsal"):
+        mr.ci_main(args)
+
+    args.models = "claude-haiku"
+    args.runs = 1
+    args.limit = 1
+    args.create_draft = True
+    with pytest.raises(mr.ReleaseError, match="can never create a draft"):
+        mr.ci_main(args)
+
+
+def test_unmerged_rehearsal_does_not_require_github_token(mr, tmp_path, monkeypatch):
+    args = _ci_args(mr, tmp_path)
+    args.candidate_ref = "refs/pull/163/head"
+    args.create_draft = False
+    args.models = "claude-haiku"
+    args.runs = 1
+    args.limit = 1
+    monkeypatch.setenv("NVIDIA_INTERNAL_API_KEY", "disposable-test-key")
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.setattr(mr, "tool_versions", lambda _image: {})
+    monkeypatch.setattr(mr, "sha256", lambda _path: "e" * 64)
+    monkeypatch.setattr(
+        mr,
+        "preflight",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(mr.ReleaseError("reached preflight")),
+    )
+
+    with pytest.raises(mr.ReleaseError, match="reached preflight"):
+        mr.ci_main(args)
 
 
 @pytest.mark.parametrize("failure_point", ["deterministic", "infrastructure", "hard-gate"])
