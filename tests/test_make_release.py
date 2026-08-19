@@ -637,11 +637,31 @@ def test_unmerged_rehearsal_does_not_require_github_token(mr, tmp_path, monkeypa
     monkeypatch.setattr(
         mr,
         "preflight",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(mr.ReleaseError("reached preflight")),
+        lambda *_args, **_kwargs: ("a" * 40, "v1.2.2", "d" * 40, None),
+    )
+    monkeypatch.setattr(mr, "fast_checks", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mr, "build_and_smoke", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(mr, "_copy_distributions", lambda _path: [])
+    base = mr.ArmResults("base")
+    head = mr.ArmResults("head")
+    for arm in (base, head):
+        arm.by_case["case"] = [True]
+        arm.case_tier["case"] = "stable"
+        arm.by_test[("model", "test")] = [True]
+        arm.lock_sha256 = "f" * 64
+    clean = mr.Diff(markdown="clean")
+    monkeypatch.setattr(mr, "capability_diff", lambda *_args, **_kwargs: (clean, base, head))
+    monkeypatch.setattr(mr, "local_change_notes", lambda *_args: "local changes")
+    monkeypatch.setattr(
+        mr,
+        "generated_change_notes",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("unmerged rehearsal called GitHub")),
     )
 
-    with pytest.raises(mr.ReleaseError, match="reached preflight"):
-        mr.ci_main(args)
+    assert mr.ci_main(args) == 0
+    manifest = json.loads((tmp_path / "artifacts" / "release-manifest.json").read_text())
+    assert manifest["status"] == "passed"
+    assert manifest["unmerged_candidate"] is True
 
 
 @pytest.mark.parametrize("failure_point", ["deterministic", "infrastructure", "hard-gate"])

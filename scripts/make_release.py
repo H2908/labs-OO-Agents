@@ -1308,6 +1308,17 @@ def generated_change_notes(tag: str, sha: str, prev_tag: str) -> str:
         die("GitHub returned invalid generated release notes")
 
 
+def local_change_notes(sha: str, prev_tag: str) -> str:
+    """Generate rehearsal-only notes without requiring GitHub credentials."""
+    proc = run(
+        ["git", "log", "--format=- %s (`%h`)", f"{prev_tag}..{sha}"],
+        check=False,
+    )
+    if proc.returncode != 0:
+        die(f"could not generate local rehearsal change notes: {proc.stderr.strip()}")
+    return proc.stdout.strip()
+
+
 def build_public_notes(
     *,
     tag: str,
@@ -1649,7 +1660,11 @@ def ci_main(args: argparse.Namespace) -> int:
         if diff.floor_breach:
             die(f"capability hard gate failed: {diff.floor_breach}")
 
-        change_notes = generated_change_notes(args.tag, head_sha, prev_tag)
+        change_notes = (
+            local_change_notes(head_sha, prev_tag)
+            if unmerged_candidate
+            else generated_change_notes(args.tag, head_sha, prev_tag)
+        )
         notes = build_public_notes(
             tag=args.tag,
             sha=head_sha,
