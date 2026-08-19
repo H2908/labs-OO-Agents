@@ -384,6 +384,30 @@ def test_existing_release_must_be_matching_unpublished_draft(mr, monkeypatch):
         mr.validate_existing_release("v1.2.3", sha)
 
 
+def test_strict_fast_checks_sync_all_public_ci_dependencies_first(mr, monkeypatch):
+    commands = []
+
+    def fake_run(cmd, **_kwargs):
+        commands.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(mr, "run", fake_run)
+
+    mr.fast_checks(verify_containment=True)
+
+    assert commands[0] == [
+        "uv",
+        "sync",
+        "--frozen",
+        "--all-extras",
+        "--no-extra",
+        "sandbox",
+    ]
+    assert commands.index(["uv", "run", "ruff", "check", "."]) < commands.index(
+        ["uv", "run", "pytest", "-q", "-m", "not integration and not stress"]
+    )
+
+
 def test_strict_arm_uses_explicit_wheel_without_env_or_ambient_extras(mr, tmp_path, monkeypatch):
     tree = tmp_path / "tree"
     tree.mkdir()

@@ -378,12 +378,24 @@ def fast_checks(
 ) -> None:
     """Everything cheap, before spending money on LLM calls."""
     step("Fast checks (lint, headers, unit tests)")
-    for label, cmd in [
+    checks = [
         ("ruff lint", ["uv", "run", "ruff", "check", "."]),
         ("ruff format", ["uv", "run", "ruff", "format", "--check", "."]),
         ("license headers", ["uv", "run", "python", "scripts/check_license_headers.py"]),
         ("unit tests", ["uv", "run", "pytest", "-q", "-m", "not integration and not stress"]),
-    ]:
+    ]
+    if verify_containment:
+        # Match public CI exactly. The release clone starts without a virtual
+        # environment, and `uv run` alone does not install optional test extras.
+        checks.insert(
+            0,
+            (
+                "locked environment sync",
+                ["uv", "sync", "--frozen", "--all-extras", "--no-extra", "sandbox"],
+            ),
+        )
+
+    for label, cmd in checks:
         proc = run(cmd, check=False)
         if proc.returncode != 0:
             if manifest:
