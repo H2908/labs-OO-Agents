@@ -269,6 +269,17 @@ def test_exact_sha_validation(mr):
             mr.validate_candidate_sha(invalid)
 
 
+def test_git_returns_empty_when_an_allowed_failure_echoes_the_unresolved_ref(mr, monkeypatch):
+    unresolved = "refs/tags/v0.0.10^{commit}"
+    monkeypatch.setattr(
+        mr,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 128, unresolved + "\n", ""),
+    )
+
+    assert mr.git("rev-parse", unresolved, check=False) == ""
+
+
 @pytest.mark.parametrize(
     "candidate_ref",
     ["refs/heads/topic", "refs/pull/0/head", "refs/pull/163/merge", "refs/pull/1/head:evil"],

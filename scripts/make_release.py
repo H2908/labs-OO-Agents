@@ -149,7 +149,13 @@ def run(
 
 
 def git(*args: str, cwd: Path | None = None, check: bool = True) -> str:
-    return run(["git", *args], cwd=cwd, check=check).stdout.strip()
+    proc = run(["git", *args], cwd=cwd, check=check)
+    # Some Git commands echo an unresolved argument to stdout on failure.
+    # Callers using check=False treat an empty result as "not found", so never
+    # let diagnostic stdout masquerade as a resolved ref or tag.
+    if proc.returncode != 0:
+        return ""
+    return proc.stdout.strip()
 
 
 def confirm(prompt: str) -> bool:
