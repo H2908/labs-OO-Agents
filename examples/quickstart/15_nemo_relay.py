@@ -26,6 +26,7 @@ Usage:
 """
 
 import json
+from typing import Literal
 
 try:
     import nemo_relay
@@ -58,15 +59,16 @@ class ResearchAgent(Agent, llm=llm):
 
         return datetime.datetime.now().year
 
-    async def fact_check(self, claim: str) -> str:
-        """Evaluate whether {claim} is plausible given your knowledge.
+    @strategy(PredictStrategy())
+    async def fact_check(self, claim: str) -> Literal["plausible", "dubious"]:
+        """Evaluate whether the claim is plausible given your knowledge.
 
         Return exactly one word: "plausible" or "dubious".
         """
         ...
 
     async def summarize(self, topic: str) -> str:
-        """Research {topic} using the available tools.
+        """Research the topic using the available tools.
 
         Steps:
         1. Use self.get_current_year() to anchor your research to the present.
