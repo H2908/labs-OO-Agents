@@ -285,6 +285,9 @@ def tool_versions(image_digest: str | None) -> dict[str, str]:
         "make": ["make", "--version"],
         "gh": ["gh", "--version"],
     }.items():
+        if shutil.which(cmd[0]) is None:
+            versions[name] = "unavailable"
+            continue
         proc = run(cmd, check=False)
         versions[name] = (
             (proc.stdout or proc.stderr).splitlines()[0].strip()
@@ -307,7 +310,11 @@ def preflight(
     ci: bool = False,
     allow_unmerged_candidate: bool = False,
 ) -> tuple[str, str, str, dict[str, Any] | None]:
-    """Validate repo state. Returns (head_sha, previous_version_tag)."""
+    """Validate repo state.
+
+    Returns (head_sha, previous_version_tag, previous_version_sha,
+    existing_draft_release_or_None).
+    """
     step(f"Preflight for {tag}")
 
     validate_tag(tag)
@@ -1328,11 +1335,17 @@ def build_public_notes(
     change_notes: str,
     pipeline_url: str,
     distributions: list[dict[str, str]],
+    capability_gate_ran: bool,
 ) -> str:
     advisory_count = (
         len(diff.regressions) + len(diff.new_errors) + len(diff.beyond_noise) + len(diff.removed)
     )
-    verdict = "PASS — all automated hard gates passed"
+    if not capability_gate_ran:
+        verdict = "NOT RUN — the capability gate was skipped for this candidate"
+    elif diff.hard_gate_passed:
+        verdict = "PASS — all automated hard gates passed"
+    else:
+        verdict = f"FAIL — {diff.floor_breach}"
     checksum_lines = [
         f"- `{Path(item['path']).name}` — `{item['sha256']}`" for item in distributions
     ]
@@ -1673,6 +1686,7 @@ def ci_main(args: argparse.Namespace) -> int:
             change_notes=change_notes,
             pipeline_url=args.pipeline_url,
             distributions=distributions,
+            capability_gate_ran=True,
         )
         notes_path = artifact_dir / "public-release-notes.md"
         notes_path.write_text(notes)
@@ -1762,6 +1776,7 @@ def local_main(args: argparse.Namespace) -> int:
             for path in sorted((REPO / "dist").iterdir())
             if path.is_file()
         ],
+        capability_gate_ran=not args.skip_capability,
     )
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as fh:
         fh.write(notes)

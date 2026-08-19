@@ -69,11 +69,12 @@ toolchain identity, check outcomes, capability scope/results, distribution
 checksums, and draft identity. Raw `.noo-eval.jsonl` files and traces are private
 artifacts and must not be copied into the public draft.
 
-Hard or infrastructure failure creates no draft. Fix the problem and start a
-new pipeline with the same tag and SHA. If draft creation failed after the gate,
-rerun: reconciliation updates an exact matching draft without duplication. If a
-draft has the wrong target or a release is already published, the runner stops
-instead of mutating it.
+Hard-gate failure or capability-infrastructure failure before draft creation
+creates no draft. Fix the problem and start a new pipeline with the same tag
+and SHA. A failure after `gh release create` or `gh release edit` may leave a
+draft requiring reconciliation; rerun to update an exact matching draft without
+duplication. If a draft has the wrong target or a release is already published,
+the runner stops instead of mutating it.
 
 Use the controller's one-model/one-run/one-sample rehearsal mode to exercise
 setup and reporting cheaply; rehearsals can never create a draft. Before first

@@ -280,6 +280,23 @@ def test_git_returns_empty_when_an_allowed_failure_echoes_the_unresolved_ref(mr,
     assert mr.git("rev-parse", unresolved, check=False) == ""
 
 
+def test_tool_versions_records_missing_diagnostic_tools(mr, monkeypatch):
+    monkeypatch.setattr(mr.shutil, "which", lambda _executable: None)
+    monkeypatch.setattr(
+        mr,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("missing diagnostic tool was executed")
+        ),
+    )
+
+    versions = mr.tool_versions("release-image@sha256:digest")
+
+    assert versions["runner_image"] == "release-image@sha256:digest"
+    for tool in ("uv", "git", "rg", "sha256sum", "base64", "curl", "gcc", "make", "gh"):
+        assert versions[tool] == "unavailable"
+
+
 @pytest.mark.parametrize(
     "candidate_ref",
     ["refs/heads/topic", "refs/pull/0/head", "refs/pull/163/merge", "refs/pull/1/head:evil"],
@@ -577,6 +594,32 @@ def test_public_report_sanitization(mr):
     assert "alice:password" not in safe
     assert "/home/alice" not in safe
     assert "[REDACTED]" in safe and "[private-path]" in safe
+
+
+@pytest.mark.parametrize(
+    ("capability_gate_ran", "diff", "expected", "unexpected"),
+    [
+        (False, None, "NOT RUN — the capability gate was skipped", "PASS"),
+        (True, None, "PASS — all automated hard gates passed", "NOT RUN"),
+        (True, "stable floor", "FAIL — stable floor", "PASS"),
+    ],
+)
+def test_public_notes_report_the_actual_capability_gate_state(
+    mr, capability_gate_ran, diff, expected, unexpected
+):
+    notes = mr.build_public_notes(
+        tag="v1.2.3",
+        sha="a" * 40,
+        prev_tag="v1.2.2",
+        diff=mr.Diff(floor_breach=diff, markdown="capability report"),
+        change_notes="changes",
+        pipeline_url="https://gitlab.example/pipelines/1",
+        distributions=[],
+        capability_gate_ran=capability_gate_ran,
+    )
+
+    assert expected in notes
+    assert unexpected not in notes
 
 
 def _ci_args(mr, tmp_path):
