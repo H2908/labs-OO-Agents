@@ -34,12 +34,12 @@ WIKI_SERVER = str(Path(__file__).resolve().parent.parent / "assets" / "wiki_mcp_
 class WikiAgent(Agent, llm=llm):
     """Agent with MCP tool access to an internal wiki."""
 
+    wiki: MCPTool
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Each MCPTool owns connection state, so keep it per agent instance.
-        self.wiki: MCPTool = MCPManager.create_from_server(
-            "wiki", mcp_file=MCP_CONFIG, args=[WIKI_SERVER]
-        )
+        self.wiki = MCPManager.create_from_server("wiki", mcp_file=MCP_CONFIG, args=[WIKI_SERVER])
 
     async def respond(self, prompt: str) -> str:
         """Answer the user's question using the wiki search tool.

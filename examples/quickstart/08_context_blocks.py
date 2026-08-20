@@ -32,7 +32,6 @@ class NoteTakingAgent(Agent, llm=llm):
         """Store this note using add_note and confirm what was saved."""
         ...
 
-    @strategy(PredictStrategy())
     async def answer(self, question: str) -> str:
         """Answer the question using the notes visible in your context."""
         ...
@@ -67,7 +66,5 @@ async def main():
         "Always prefer rollback over forward-fix during incidents.",
         prefix=True,
     )
-    answer2 = await agent.answer(
-        "According to the incident policy, should we fix forward or roll back?"
-    )
+    answer2 = await agent.answer("Should we try to fix forward or roll back?")
     print(f"Answer: {answer2}")

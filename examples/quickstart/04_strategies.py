@@ -16,6 +16,8 @@ from nooa.util.quickstart import *
 class AnalysisAgent(Agent, llm=llm):
     """Agent demonstrating different strategy options."""
 
+    shell: ShellTools
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # ShellTools owns a persistent session. Keep it local to this agent.

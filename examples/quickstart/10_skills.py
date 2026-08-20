@@ -15,20 +15,6 @@ from nooa.util.quickstart import *
 ASSETS = Path(__file__).parent.parent / "assets"
 
 
-class DesignProposal(BaseModel):
-    aesthetic_direction: str = Field(
-        description="A specific visual direction in one short sentence.",
-    )
-    memorable_detail: str = Field(
-        description="The one detail visitors should remember, in one short sentence.",
-    )
-    anti_patterns_to_avoid: list[str] = Field(
-        min_length=2,
-        max_length=2,
-        description="Exactly two visual anti-patterns rejected by the skill guidance.",
-    )
-
-
 class FrontendAgent(Agent, llm=llm):
     """Agent with a single file-based skill."""
 
@@ -38,14 +24,8 @@ class FrontendAgent(Agent, llm=llm):
         super().__init__(*args, **kwargs)
         self.frontend_design = TextSkill(path=ASSETS / "frontend-design")
 
-    @strategy(PredictStrategy())
-    async def respond(self, prompt: str) -> DesignProposal:
-        """Respond using this attached skill guidance:
-
-        {doc(self.frontend_design)}
-
-        Return ``DesignProposal`` directly; do not wrap it in another object.
-        """
+    async def respond(self, prompt: str) -> str:
+        """Respond to a user message."""
         ...
 
 
@@ -61,32 +41,16 @@ class GenericAgent(Agent, llm=llm):
         )
         self.skills.activate(["local.frontend_design"])
 
-    @strategy(PredictStrategy())
-    async def respond(self, prompt: str) -> DesignProposal:
-        """Respond using this active skill guidance:
-
-        {doc(self.frontend_design)}
-
-        Return ``DesignProposal`` directly; do not wrap it in another object.
-        """
+    async def respond(self, prompt: str) -> str:
+        """Respond to a user message."""
         ...
 
 
 @autorun
 async def main():
-    request = (
-        "Follow the attached frontend-design skill to propose a memorable aesthetic "
-        "direction for a responsive landing page. Include one signature detail and "
-        "exactly two visual anti-patterns that the skill explicitly rejects. Keep each "
-        "field and anti-pattern to one short sentence."
-    )
-
-    print("=== Direct TextSkill attachment ===")
     agent = FrontendAgent()
-    result = await agent.respond(request)
+    result = await agent.respond("Can you build a responsive layout for a landing page?")
     print(result)
-
-    print("\n=== SkillRegistry activation ===")
     agent = GenericAgent()
-    result = await agent.respond(request)
+    result = await agent.respond("Can you build a responsive layout for a landing page?")
     print(result)

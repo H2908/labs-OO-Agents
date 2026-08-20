@@ -23,12 +23,6 @@ from nooa.util.quickstart import *  # noqa: F403
 Category = Literal["bug", "feature", "question"]
 
 
-class TriageCounts(BaseModel):
-    bug: int = Field(ge=0)
-    feature: int = Field(ge=0)
-    question: int = Field(ge=0)
-
-
 @strategy(PredictStrategy())
 async def categorize_ticket(ticket: str) -> Category:
     """Classify a single support ticket into its category."""
@@ -52,11 +46,10 @@ class TicketTriageAgent(Agent, llm=llm):
         """Return the open support tickets to triage."""
         return self.tickets
 
-    async def triage(self) -> TriageCounts:
+    async def triage(self) -> dict[Category, int]:
         """Categorize every open ticket and return the count per category.
 
         Classify each ticket with the async ``categorize_ticket`` helper.
-        Return ``TriageCounts`` directly; do not wrap it in another object.
         """
         ...
 
@@ -69,7 +62,7 @@ async def main():
 
     agent = TicketTriageAgent()
     counts = await agent.triage()
-    print(f"Triage result: {counts.model_dump()}")
+    print(f"Triage result: {counts}")
 
     latest = max(
         Path("logs/atif/TicketTriageAgent").glob("*.json"),

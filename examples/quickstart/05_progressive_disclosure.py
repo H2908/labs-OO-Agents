@@ -28,12 +28,7 @@ class WarehouseAppraiser(Agent, llm=llm):
         return _WAREHOUSE.get(item_id)
 
     async def appraise_item(self, item_id: str) -> float:
-        """Retrieve the item, inspect its documented API, and return its exact value.
-
-        Use self.get_item(item_id), then use doc(item) to discover and call the
-        item's valuation method. Do not estimate a value from its attributes.
-        If the documented method returns a mapping, return its numeric ``value``.
-        """
+        """Get the monetary value of an item."""
         ...
 
 
