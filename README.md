@@ -82,15 +82,16 @@ uv add nooa
 Or with pip: `pip install nooa`.
 
 <details>
-<summary><b>Optional sub-packages</b> — CLI, memory, benchmarks, evaluation pipeline</summary>
+<summary><b>Optional sub-packages</b> — CLI, ACP, memory, benchmarks, evaluation pipeline</summary>
 
 <br />
 
-The CLI, memory, and benchmark packages are separate distributions. Install
+The CLI, ACP, memory, and benchmark packages are separate distributions. Install
 them by name, or pull them in as extras of the core package:
 
 ```bash
 uv add nooa-cli                 # or: uv add "nooa[cli]"
+uv add nooa-acp                 # or: uv add "nooa[acp]"
 uv add nooa-memory              # or: uv add "nooa[memory]"
 uv add nooa-bench               # or: uv add "nooa[bench]"
 
@@ -100,6 +101,7 @@ uv add "nooa[cli,memory]"       # several at once
 | Package | Extra | What it adds |
 |---|---|---|
 | `nooa-cli` | `nooa[cli]` | the `nooa` command, trace viewer, eval runner |
+| `nooa-acp` | `nooa[acp]` | coding agent for Agent Client Protocol hosts such as Zed — [setup](packages/nooa-acp/README.md) |
 | `nooa-memory` | `nooa[memory]` | long-term memory subsystem (`MemoryManager`) |
 | `nooa-bench` | `nooa[bench]` | `BenchAgent` and the Harbor benchmark runner |
 
