@@ -1,4 +1,24 @@
-# NVIDIA-labs Object Oriented Agents documentation
+<div align="center">
+
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="../assets/nvidia-labs-object-oriented-agents-dark.svg"
+  >
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="../assets/nvidia-labs-object-oriented-agents-light.svg"
+  >
+  <img
+    alt="NVIDIA-labs Object Oriented Agents"
+    src="../assets/nvidia-labs-object-oriented-agents-light.svg"
+    width="820"
+  >
+</picture>
+
+</div>
+
+# Documentation
 
 NVIDIA-labs Object Oriented Agents (NOOA) is a Python framework in which an
 agent is an object and its methods are its capabilities. An asynchronous method

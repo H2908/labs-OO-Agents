@@ -127,3 +127,5 @@ Python calls, conditions become `if`, and fan-out becomes `asyncio.gather`.
 - [Tracing](tracing.md)
 - [Safety](safety.md)
 - [Architecture](../architecture.md)
+- Runnable example: [tracing quickstart](../../examples/quickstart/06_tracing.py)
+- Guided tutorial: [composing subagents](../../notebook_tutorials/04_composing_subagents.ipynb)
