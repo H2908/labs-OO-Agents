@@ -173,6 +173,7 @@ class CodeActSession:
     session_locals: dict[str, Any] = field(default_factory=dict)
     out_accessor: Any = field(default=None)  # OutAccessor instance, created lazily
     sandbox_executor: Any = field(default=None)  # SandboxedExecutor when backend="sandbox"
+    execution_count: int = 0
 
     def __post_init__(self) -> None:
         """Initialize OutAccessor for Jupyter-style Out[n] access."""
@@ -189,6 +190,11 @@ class CodeActSession:
 
     def record_iteration(self) -> None:
         self.iteration += 1
+
+    def record_execution(self) -> int:
+        """Advance and return the per-cell execution counter."""
+        self.execution_count += 1
+        return self.execution_count
 
     def record_error(self) -> None:
         self.error_count += 1
@@ -1040,6 +1046,7 @@ Standard Python builtins and agent instance (`self`) are available."""
                 # execute_python comment that preserves content in traces.
                 elif _has_text:
                     session.record_iteration()
+                    execution_count = session.record_execution()
                     # Capture the drift faithfully for /bug + replay (recorded but
                     # Role.METADATA, never shown to the model). Replaces the old
                     # lossy DebugTrace.
@@ -1069,7 +1076,7 @@ Standard Python builtins and agent instance (`self`) are available."""
                     runtime.event_manager.add(
                         PythonOutput(
                             tool_call_id=synthetic_id,
-                            execution_count=session.iteration or 1,
+                            execution_count=execution_count,
                             execution_status=ResultStatus.COMPLETE,
                             metadata={"synthetic": True, "synthetic_type": "text_response"},
                         )
@@ -1460,6 +1467,7 @@ Standard Python builtins and agent instance (`self`) are available."""
         """
         method_name = call.method_name
         code = args.get("code", "")
+        execution_count = session.record_execution()
 
         # Strip markdown fences early — validator and helper binding below
         # run ast.parse() which fails on fenced input. (runtime.execute_code
@@ -1484,7 +1492,7 @@ Standard Python builtins and agent instance (`self`) are available."""
             runtime.event_manager.add(
                 PythonOutput(
                     tool_call_id=tool_call.id,
-                    execution_count=session.iteration,
+                    execution_count=execution_count,
                     stdout="",
                     stderr="",
                     error="Execution error: empty code provided.",
@@ -1613,7 +1621,7 @@ Standard Python builtins and agent instance (`self`) are available."""
             runtime.event_manager.add(
                 PythonOutput(
                     tool_call_id=tool_call.id,
-                    execution_count=session.iteration,
+                    execution_count=execution_count,
                     stdout=result.stdout,
                     stderr=stderr,
                     error=error_text,
@@ -1655,7 +1663,7 @@ Standard Python builtins and agent instance (`self`) are available."""
                     runtime.event_manager.add(
                         PythonOutput(
                             tool_call_id=tool_call.id,
-                            execution_count=session.iteration,
+                            execution_count=execution_count,
                             stdout=result.stdout,
                             stderr=result.stderr,
                             value=result.returned_value,
@@ -1704,7 +1712,7 @@ Standard Python builtins and agent instance (`self`) are available."""
         runtime.event_manager.add(
             PythonOutput(
                 tool_call_id=tool_call.id,
-                execution_count=session.iteration,
+                execution_count=execution_count,
                 stdout=result.stdout,
                 stderr=result.stderr,
                 error=error_text,
@@ -2668,7 +2676,11 @@ Standard Python builtins and agent instance (`self`) are available."""
                 explicit_return=result.explicit_return if result.has_return else False,
                 execution_status=final_status,
                 images=result.images,
-                metadata={"prefill": True, "prefill_type": prefill_type},
+                metadata={
+                    "prefill": True,
+                    "prefill_type": prefill_type,
+                    **({"execution_error": True} if result.error else {}),
+                },
             )
         )
 
@@ -2719,7 +2731,7 @@ Standard Python builtins and agent instance (`self`) are available."""
                     wrap_in_function=True,
                     timeout=self.config.cell_timeout,
                     tool_call_id=tool_call_id,
-                    execution_count=session.iteration,
+                    execution_count=session.execution_count,
                     restrictions=self.config.restrictions,
                     sandbox_executor=session.sandbox_executor,
                 )
@@ -2774,7 +2786,7 @@ Standard Python builtins and agent instance (`self`) are available."""
                 wrap_in_function=True,
                 timeout=self.config.cell_timeout,
                 tool_call_id=tool_call_id,
-                execution_count=session.iteration,
+                execution_count=session.execution_count,
                 restrictions=self.config.restrictions,
             )
 
