@@ -72,6 +72,7 @@ from nooa.unifiedllm import Tool, ToolCall
 if TYPE_CHECKING:
     from nooa.config.strategy_config import CodeActConfig
     from nooa.errors.formatting import ErrorFormatter
+    from nooa.events import ExecutionResult
     from nooa.strategies.current_call import CurrentCall
 
 logger = logging.getLogger(__name__)
@@ -1601,17 +1602,7 @@ Standard Python builtins and agent instance (`self`) are available."""
                     ),
                 )
 
-            error_text = ""
-            if result.error:
-                line_offset = getattr(result, "wrapper_line_offset", 0)
-                error_text = self._format_error(
-                    result.error,
-                    code,
-                    line_offset=line_offset,
-                    formatted_error=result.formatted_error,
-                    max_error=runtime.truncation_config.capture.max_error,
-                    tail_chars=runtime.truncation_config.capture.tail,
-                )
+            error_text = self._format_execution_error(runtime, result, code)
             stderr = result.stderr
             if validation_error:
                 stderr = (
@@ -1692,25 +1683,12 @@ Standard Python builtins and agent instance (`self`) are available."""
         # Only explicit `return x` statements can auto-complete the task.
 
         # Format error if present
-        error_text = ""
-        if result.error:
-            line_offset = getattr(result, "wrapper_line_offset", 0)
-            if (
-                isinstance(result.error, PydanticValidationError)
-                and result.returned_value is not None
-            ):
-                error_text = format_validation_error(
-                    result.error, return_type, result.returned_value, runtime.truncation_config
-                )
-            else:
-                error_text = self._format_error(
-                    result.error,
-                    code,
-                    line_offset=line_offset,
-                    formatted_error=result.formatted_error,
-                    max_error=runtime.truncation_config.capture.max_error,
-                    tail_chars=runtime.truncation_config.capture.tail,
-                )
+        error_text = self._format_execution_error(
+            runtime,
+            result,
+            code,
+            return_type=return_type,
+        )
 
         # Add PythonOutput with actual output and value
         runtime.event_manager.add(
@@ -2659,17 +2637,7 @@ Standard Python builtins and agent instance (`self`) are available."""
         )
 
         # Format error if present
-        error_text = ""
-        if result.error:
-            line_offset = getattr(result, "wrapper_line_offset", 0)
-            error_text = self._format_error(
-                result.error,
-                code,
-                line_offset=line_offset,
-                formatted_error=result.formatted_error,
-                max_error=runtime.truncation_config.capture.max_error,
-                tail_chars=runtime.truncation_config.capture.tail,
-            )
+        error_text = self._format_execution_error(runtime, result, code)
 
         # Add execution output as a user message with this cell's unique count.
         runtime.event_manager.add(
@@ -2796,6 +2764,37 @@ Standard Python builtins and agent instance (`self`) are available."""
                 execution_count=session.execution_count,
                 restrictions=self.config.restrictions,
             )
+
+    def _format_execution_error(
+        self,
+        runtime: RuntimeServices,
+        result: "ExecutionResult",
+        code: str,
+        *,
+        return_type: Any = None,
+    ) -> str:
+        """Render one execution failure with the runtime's capture policy."""
+        if result.error is None:
+            return ""
+        if (
+            return_type is not None
+            and isinstance(result.error, PydanticValidationError)
+            and result.returned_value is not None
+        ):
+            return format_validation_error(
+                result.error,
+                return_type,
+                result.returned_value,
+                runtime.truncation_config,
+            )
+        return self._format_error(
+            result.error,
+            code,
+            line_offset=result.wrapper_line_offset,
+            formatted_error=result.formatted_error,
+            max_error=runtime.truncation_config.capture.max_error,
+            tail_chars=runtime.truncation_config.capture.tail,
+        )
 
     def _format_error(
         self,

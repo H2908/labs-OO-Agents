@@ -52,8 +52,8 @@ class _ErrorFormatter(Protocol):
     ) -> str: ...
 
 
-def _effective_error_limit(max_error: int | None) -> int:
-    """Return the configured content budget clamped to the IPC safety ceiling."""
+def effective_error_limit(max_error: int | None) -> int:
+    """Return a valid diagnostic budget clamped to the sandbox IPC ceiling."""
     requested = (
         max_error
         if isinstance(max_error, int) and not isinstance(max_error, bool) and max_error > 0
@@ -69,7 +69,7 @@ def _bounded_error_message(
     tail_chars: int | None = None,
 ) -> str:
     """Apply the effective capture policy once to a raw message before IPC."""
-    content_limit = _effective_error_limit(max_error)
+    content_limit = effective_error_limit(max_error)
     _, effective_tail = _diagnostic_budget(content_limit, tail_chars)
     if len(value) <= content_limit:
         return value
@@ -85,7 +85,7 @@ def _bounded_formatted_error(
     tail_chars: int | None = None,
 ) -> str:
     """Apply capture policy once and enforce a fixed IPC ceiling."""
-    content_limit = _effective_error_limit(max_error)
+    content_limit = effective_error_limit(max_error)
     bounded = _bound_preformatted_diagnostic(value, content_limit, tail_chars)
     return _hard_bound_text(bounded, min(_MAX_ERROR_TRANSPORT, content_limit + 1_024))
 
@@ -111,8 +111,7 @@ class ErrorDTO:
 class SignalDTO:
     """Picklable surrogate for a ``return_result()`` control-flow signal."""
 
-    result: Any
-    result_is_pickled: bool = False
+    result: bytes
 
 
 @dataclass
@@ -123,8 +122,7 @@ class ResultDTO:
     stderr: str = ""
     error: ErrorDTO | None = None
     signal: SignalDTO | None = None
-    returned_value: Any = None
-    returned_value_is_pickled: bool = False
+    returned_value: bytes = b""
     has_return: bool = False
     explicit_return: bool = False
     images: list[dict[str, Any]] = field(default_factory=list)
@@ -186,7 +184,7 @@ def result_to_dto(
 
             error_formatter = format_error_for_llm
 
-        effective_max_error = _effective_error_limit(max_error)
+        effective_max_error = effective_error_limit(max_error)
         try:
             formatted_error = error_formatter(
                 err,
@@ -230,7 +228,7 @@ def result_to_dto(
                 ),
             )
         else:
-            dto.signal = SignalDTO(result=pickled_payload, result_is_pickled=True)
+            dto.signal = SignalDTO(result=pickled_payload)
         return dto
 
     rv = result.returned_value
@@ -248,7 +246,6 @@ def result_to_dto(
             )
         else:
             dto.returned_value = pickled_return
-            dto.returned_value_is_pickled = True
             dto.has_return = True
             dto.explicit_return = bool(result.explicit_return)
     return dto
@@ -309,18 +306,9 @@ def dto_to_result(dto: ResultDTO, *, signal_factory: Any = None) -> Any:
     returned_value: Any = _NO_RETURN
     try:
         if dto.signal is not None and signal_factory is not None:
-            signal_payload = (
-                pickle.loads(dto.signal.result)
-                if getattr(dto.signal, "result_is_pickled", False)
-                else dto.signal.result
-            )
-            signal = signal_factory(signal_payload)
+            signal = signal_factory(pickle.loads(dto.signal.result))
         if dto.has_return:
-            returned_value = (
-                pickle.loads(dto.returned_value)
-                if getattr(dto, "returned_value_is_pickled", False)
-                else dto.returned_value
-            )
+            returned_value = pickle.loads(dto.returned_value)
     except BaseException:
         error = CellSerializationError(
             "A sandbox result could not be deserialized across the process boundary."

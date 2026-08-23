@@ -22,7 +22,6 @@ from multiprocessing.connection import Connection
 from multiprocessing.process import BaseProcess
 from typing import Any
 
-from nooa.config.truncation_config import DEFAULT_TRUNCATION_CONFIG
 from nooa.errors.formatting import _hard_bound_text
 from nooa.events import ExecutionResult
 from nooa.runtime.sandbox.config import ResolvedSpec, SandboxConfig, resolve_spec
@@ -34,16 +33,19 @@ from nooa.runtime.sandbox.errors import (
     WorkerDiedError,
 )
 from nooa.runtime.sandbox.guards import Capabilities, probe_capabilities
-from nooa.runtime.sandbox.serialization import ResultDTO, dto_to_result, is_picklable
+from nooa.runtime.sandbox.serialization import (
+    ResultDTO,
+    dto_to_result,
+    effective_error_limit,
+    is_picklable,
+)
 from nooa.runtime.sandbox.worker import worker_main
 
 logger = logging.getLogger(__name__)
 
 
 # Broker responses cross a pickle pipe. Keep all parent-generated diagnostics
-# primitive and bounded before sending them to an untrusted worker. Runtime
-# configuration may lower this ceiling but may not raise the IPC safety cap.
-_MAX_BROKER_DIAGNOSTIC = DEFAULT_TRUNCATION_CONFIG.capture.max_error
+# primitive and bounded before sending them to an untrusted worker.
 
 
 def _bounded_text(value: object, fallback: str, *, limit: int) -> str:
@@ -98,12 +100,7 @@ class SandboxedExecutor:
         self._cell_timeout = cell_timeout
         self._framework_builtins = framework_builtins or {}
         self._restrictions = restrictions
-        requested_max_error = (
-            max_error
-            if isinstance(max_error, int) and not isinstance(max_error, bool) and max_error > 0
-            else DEFAULT_TRUNCATION_CONFIG.capture.max_error
-        )
-        self._max_error = min(requested_max_error, _MAX_BROKER_DIAGNOSTIC)
+        self._max_error = effective_error_limit(max_error)
         self._error_tail = error_tail
         self._spec: ResolvedSpec = resolve_spec(config)
 

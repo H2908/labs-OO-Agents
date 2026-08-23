@@ -102,6 +102,11 @@ class GenerationSession:
     def record_iteration(self) -> None:
         self.iteration += 1
 
+    def record_execution(self) -> int:
+        """Advance and return the per-cell execution counter."""
+        self.execution_count += 1
+        return self.execution_count
+
     def record_error(self) -> None:
         self.error_count += 1
 
@@ -387,7 +392,7 @@ class PurePythonStrategy(CompositeStrategy):
                     await self._send_empty_response_error(runtime, call.method_name)
                     continue
 
-                session.execution_count += 1
+                session.record_execution()
                 result = await self._execute_code(
                     runtime, code, builtins, session, call.method_name
                 )

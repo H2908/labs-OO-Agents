@@ -24,7 +24,6 @@ from nooa.runtime.sandbox.readonly import SandboxStateError
 from nooa.runtime.sandbox.serialization import (
     ErrorDTO,
     ResultDTO,
-    SignalDTO,
     _SurrogateCellError,
     dto_to_result,
     result_to_dto,
@@ -445,22 +444,6 @@ def test_return_result_payload_is_pickled_only_once_before_transport() -> None:
     assert _PicklesOnlyOnce.calls == 1
     assert result.signal is not None
     assert result.signal.result == "serialized once"
-
-
-def test_legacy_unencoded_return_dto_still_decodes() -> None:
-    result = dto_to_result(ResultDTO(returned_value={"answer": 42}, has_return=True))
-
-    assert result.error is None
-    assert result.returned_value == {"answer": 42}
-
-
-def test_legacy_unencoded_signal_dto_still_decodes() -> None:
-    dto = ResultDTO(signal=SignalDTO(result={"answer": 42}))
-    result = dto_to_result(dto, signal_factory=lambda value: SignalWithResult(value))
-
-    assert result.error is None
-    assert result.signal is not None
-    assert result.signal.result == {"answer": 42}
 
 
 def test_unpicklable_ordinary_return_becomes_serialization_error() -> None:
