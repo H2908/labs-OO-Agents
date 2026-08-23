@@ -329,13 +329,10 @@ class CodeActStrategy(CompositeStrategy):
         Args:
             config: CodeActConfig with iteration limits, timeouts, and sampling params.
                     Defaults to CodeActConfig() with standard defaults.
-            error_formatter: Custom error formatter for LLM feedback. The preferred
-                signature is ``format(error, code=None, *, line_offset=0,
-                formatted_error="", max_error=None, tail_chars=None)``. Older ``format(error, code, *,
-                line_offset=0)`` and ``format(error, code)`` implementations remain
-                supported. Formatters accepting ``formatted_error`` receive a
-                traceback rendered inside a sandbox worker; only the preferred
-                form also receives the resolved error budget.
+            error_formatter: Custom error formatter for LLM feedback. It must implement
+                ``format(error, code=None, *, line_offset=0, formatted_error="",
+                max_error=None, tail_chars=None)``. ``formatted_error`` contains a
+                traceback rendered inside a sandbox worker, when available.
 
         Note:
             Prefill is always enabled and uses InspectInputsPrefill internally.
@@ -2812,62 +2809,13 @@ Standard Python builtins and agent instance (`self`) are available."""
     ) -> str:
         """Format an error for display using the configured formatter."""
         if self.error_formatter is not None:
-            # Select a compatible call shape without invoking the formatter. A
-            # TypeError raised *inside* a custom formatter is its real failure and
-            # must not be mistaken for an older method signature.
-            formatter: Any = self.error_formatter.format
-            try:
-                signature = inspect.signature(formatter)
-            except (TypeError, ValueError):
-                # Some extension/builtin callables expose no signature metadata.
-                # The original formatter contract was exactly two positional
-                # arguments, so invoke that shape once rather than speculatively
-                # executing and retrying after a body-level TypeError.
-                return formatter(error, code)
-            optional_values = {
-                "code": code,
-                "line_offset": line_offset,
-                "formatted_error": formatted_error,
-                "max_error": max_error,
-                "tail_chars": tail_chars,
-            }
-            accepts_kwargs = any(
-                parameter.kind is inspect.Parameter.VAR_KEYWORD
-                for parameter in signature.parameters.values()
-            )
-            # Prefer named dispatch so a valid second parameter such as
-            # ``formatted_error`` is not mistaken for the legacy positional
-            # ``code`` argument. Fall back to two positional arguments only for
-            # positional-only or differently named legacy signatures.
-            for args in ((error,), (error, code)):
-                try:
-                    positional = signature.bind_partial(*args)
-                except TypeError:
-                    continue
-                kwargs = {
-                    name: value
-                    for name, value in optional_values.items()
-                    if name not in positional.arguments
-                    and (
-                        accepts_kwargs
-                        or (
-                            name in signature.parameters
-                            and signature.parameters[name].kind
-                            in (
-                                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                                inspect.Parameter.KEYWORD_ONLY,
-                            )
-                        )
-                    )
-                }
-                try:
-                    signature.bind(*args, **kwargs)
-                except TypeError:
-                    continue
-                return formatter(*args, **kwargs)
-            raise TypeError(
-                "Custom error formatter must accept format(error, code), optionally "
-                "with keyword-only line_offset, formatted_error, max_error, and tail_chars"
+            return self.error_formatter.format(
+                error,
+                code,
+                line_offset=line_offset,
+                formatted_error=formatted_error,
+                max_error=max_error,
+                tail_chars=tail_chars,
             )
 
         from nooa.errors.formatting import format_error_for_llm

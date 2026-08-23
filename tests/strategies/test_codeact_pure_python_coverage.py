@@ -14,7 +14,6 @@ pure_python.py missing: 59-61, 105-106, 147, 236-238, 243, 274-288, 304-340, 467
   896-897, 995-1000, 1023-1026, 1068-1088
 """
 
-import inspect
 import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -898,32 +897,38 @@ class TestTryValidateReturnValue:
 
 
 class TestFormatErrorCustomFormatter:
-    """Tests for _format_error with custom error formatters."""
+    """Tests for the complete custom error-formatter contract."""
 
-    def test_custom_formatter_with_line_offset(self):
-        """Custom formatter supporting line_offset should be called correctly (lines 1900-1901)."""
+    def test_custom_formatter_receives_complete_context(self):
+        class CustomFormatter:
+            def format(
+                self,
+                error,
+                code=None,
+                *,
+                line_offset=0,
+                formatted_error="",
+                max_error=None,
+                tail_chars=None,
+            ):
+                return (
+                    f"custom[{line_offset}/{max_error}/{tail_chars}]: "
+                    f"{error}: {code}: {formatted_error}"
+                )
 
-        class MyFormatter:
-            def format(self, error, code, line_offset=0):
-                return f"custom[{line_offset}]: {error}: {code}"
+        strat = CodeActStrategy(error_formatter=CustomFormatter())
+        result = strat._format_error(
+            ValueError("surrogate"),
+            "bad()",
+            line_offset=4,
+            formatted_error="Cell In[7], line 1\nValueError: original",
+            max_error=321,
+            tail_chars=17,
+        )
 
-        strat = CodeActStrategy(error_formatter=MyFormatter())
-        result = strat._format_error(ValueError("test"), "code", line_offset=5)
-        assert "custom[5]" in result
-        assert "test" in result
-        assert result.endswith(": code")
-
-    def test_custom_formatter_without_line_offset(self):
-        """Custom formatter not supporting line_offset should fall back (lines 1902-1904)."""
-
-        class OldFormatter:
-            def format(self, error, code):
-                return f"old: {error}"
-
-        strat = CodeActStrategy(error_formatter=OldFormatter())
-        result = strat._format_error(ValueError("test"), "code", line_offset=5)
-        assert "old" in result
-        assert "test" in result
+        assert result == (
+            "custom[4/321/17]: surrogate: bad(): Cell In[7], line 1\nValueError: original"
+        )
 
     def test_builtin_formatter_receives_worker_diagnostic_and_error_budget(self):
         from nooa.errors import IPythonErrorFormatter
@@ -944,8 +949,20 @@ class TestFormatErrorCustomFormatter:
         assert result.endswith("x" * 50 + "\n</truncated-output>")
         assert "surrogate" not in result
 
-    def test_custom_formatter_receives_worker_diagnostic(self):
-        class CurrentFormatter:
+    def test_incomplete_custom_formatter_is_rejected(self):
+        class IncompleteFormatter:
+            def format(self, error, code):
+                return f"old: {error}: {code}"
+
+        strat = CodeActStrategy(error_formatter=IncompleteFormatter())
+
+        with pytest.raises(TypeError, match="line_offset"):
+            strat._format_error(ValueError("test"), "code", line_offset=5)
+
+    def test_custom_formatter_body_typeerror_is_not_retried(self):
+        class BrokenFormatter:
+            calls = 0
+
             def format(
                 self,
                 error,
@@ -954,103 +971,8 @@ class TestFormatErrorCustomFormatter:
                 line_offset=0,
                 formatted_error="",
                 max_error=None,
+                tail_chars=None,
             ):
-                return f"current[{line_offset}/{max_error}]: {formatted_error}"
-
-        strat = CodeActStrategy(error_formatter=CurrentFormatter())
-        result = strat._format_error(
-            ValueError("surrogate"),
-            "bad()",
-            line_offset=4,
-            formatted_error="Cell In[7], line 1\nValueError: original",
-            max_error=321,
-        )
-
-        assert result == "current[4/321]: Cell In[7], line 1\nValueError: original"
-
-    def test_custom_formatter_without_line_offset_receives_worker_diagnostic(self):
-        class TransportFormatter:
-            def format(self, error, code=None, *, formatted_error=""):
-                return f"transported: {formatted_error}"
-
-        strat = CodeActStrategy(error_formatter=TransportFormatter())
-        result = strat._format_error(
-            ValueError("surrogate"),
-            "bad()",
-            line_offset=4,
-            formatted_error="Cell In[7], line 1\nValueError: original",
-            max_error=321,
-        )
-
-        assert result == "transported: Cell In[7], line 1\nValueError: original"
-
-    def test_custom_formatter_positional_formatted_error_is_not_mistaken_for_code(self):
-        class TransportFormatter:
-            def format(self, error, formatted_error=""):
-                return formatted_error
-
-        strat = CodeActStrategy(error_formatter=TransportFormatter())
-        result = strat._format_error(
-            ValueError("surrogate"),
-            "source code",
-            formatted_error="Cell In[7], line 1\nValueError: original",
-        )
-
-        assert result == "Cell In[7], line 1\nValueError: original"
-
-    def test_custom_formatter_positional_tail_is_not_mistaken_for_code(self):
-        class TailFormatter:
-            def format(self, error, tail_chars=None):
-                return f"tail={tail_chars}"
-
-        strat = CodeActStrategy(error_formatter=TailFormatter())
-
-        assert strat._format_error(ValueError("x"), "source code", tail_chars=17) == "tail=17"
-
-    def test_custom_formatter_receives_supported_optional_keyword_subset(self):
-        class PartialFormatter:
-            def format(self, error, code=None, *, formatted_error="", tail_chars=None):
-                return f"partial[{tail_chars}]: {formatted_error}"
-
-        strat = CodeActStrategy(error_formatter=PartialFormatter())
-        result = strat._format_error(
-            ValueError("surrogate"),
-            "bad()",
-            line_offset=4,
-            formatted_error="Cell In[7], line 1\nValueError: original",
-            max_error=321,
-            tail_chars=17,
-        )
-
-        assert result == "partial[17]: Cell In[7], line 1\nValueError: original"
-
-    def test_custom_formatter_without_inspectable_signature_uses_legacy_shape(self, monkeypatch):
-        class OpaqueFormatter:
-            calls = 0
-
-            def format(self, error, code):
-                self.calls += 1
-                return f"opaque: {error}: {code}"
-
-        formatter = OpaqueFormatter()
-        real_signature = inspect.signature
-
-        def opaque_signature(value):
-            if value == formatter.format:
-                raise ValueError("no signature metadata")
-            return real_signature(value)
-
-        monkeypatch.setattr(inspect, "signature", opaque_signature)
-        strat = CodeActStrategy(error_formatter=formatter)
-
-        assert strat._format_error(ValueError("test"), "code") == "opaque: test: code"
-        assert formatter.calls == 1
-
-    def test_custom_formatter_body_typeerror_is_not_retried(self):
-        class BrokenFormatter:
-            calls = 0
-
-            def format(self, error, code, line_offset=0):
                 self.calls += 1
                 raise TypeError("formatter body failed")
 

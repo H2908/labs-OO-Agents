@@ -17,11 +17,9 @@ into a picklable :class:`ResultDTO` and reconstructs a faithful
 
 from __future__ import annotations
 
-import inspect
 import pickle
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 from nooa.agentdoc import TruncatingStringIO
 from nooa.config.truncation_config import DEFAULT_TRUNCATION_CONFIG
@@ -37,6 +35,21 @@ from nooa.runtime.sandbox.errors import CellSerializationError
 # caller's configured capture budget.
 _MAX_ERROR_CONTENT = DEFAULT_TRUNCATION_CONFIG.capture.max_error
 _MAX_ERROR_TRANSPORT = _MAX_ERROR_CONTENT + 1_024
+
+
+class _ErrorFormatter(Protocol):
+    """Complete formatter callable contract used inside the sandbox worker."""
+
+    def __call__(
+        self,
+        error: Exception,
+        code: str | None = None,
+        *,
+        line_offset: int = 0,
+        formatted_error: str = "",
+        max_error: int | None = None,
+        tail_chars: int | None = None,
+    ) -> str: ...
 
 
 def _effective_error_limit(max_error: int | None) -> int:
@@ -136,7 +149,7 @@ class _SurrogateCellError(Exception):
 def result_to_dto(
     result: Any,
     *,
-    error_formatter: Callable[..., str] | None = None,
+    error_formatter: _ErrorFormatter | None = None,
     max_error: int | None = None,
     tail_chars: int | None = None,
 ) -> ResultDTO:
@@ -173,34 +186,14 @@ def result_to_dto(
 
         effective_max_error = _effective_error_limit(max_error)
         try:
-            line_offset = getattr(result, "wrapper_line_offset", 0)
-            formatter_kwargs: dict[str, Any] = {"line_offset": line_offset}
-            try:
-                signature = inspect.signature(error_formatter)
-            except (TypeError, ValueError):
-                signature = None
-            if signature is not None:
-                optional_values = {
-                    "line_offset": line_offset,
-                    "max_error": effective_max_error,
-                    "tail_chars": tail_chars,
-                }
-                accepts_kwargs = any(
-                    parameter.kind is inspect.Parameter.VAR_KEYWORD
-                    for parameter in signature.parameters.values()
-                )
-                formatter_kwargs = {
-                    name: value
-                    for name, value in optional_values.items()
-                    if accepts_kwargs
-                    or (
-                        name in signature.parameters
-                        and signature.parameters[name].kind
-                        in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-                    )
-                }
-                signature.bind(err, **formatter_kwargs)
-            formatted_error = error_formatter(err, **formatter_kwargs)
+            formatted_error = error_formatter(
+                err,
+                None,
+                line_offset=getattr(result, "wrapper_line_offset", 0),
+                formatted_error="",
+                max_error=effective_max_error,
+                tail_chars=tail_chars,
+            )
         except BaseException:
             formatted_error = f"{error_type}: {message}"
 

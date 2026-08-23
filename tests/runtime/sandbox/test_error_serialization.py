@@ -87,65 +87,39 @@ def test_syntax_error_keeps_formatted_source_and_caret() -> None:
     assert diagnostic.endswith("SyntaxError: invalid syntax")
 
 
-def test_error_only_worker_formatter_remains_supported() -> None:
+def test_worker_formatter_receives_complete_context() -> None:
     calls = []
 
-    def error_only_formatter(error: Exception) -> str:
-        calls.append(error)
-        return "error-only worker diagnostic"
+    def formatter(
+        error: Exception,
+        code: str | None = None,
+        *,
+        line_offset: int = 0,
+        formatted_error: str = "",
+        max_error: int | None = None,
+        tail_chars: int | None = None,
+    ) -> str:
+        calls.append((error, code, line_offset, formatted_error, max_error, tail_chars))
+        return f"worker diagnostic with tail {tail_chars}"
 
     dto = result_to_dto(
         _result_with_error(ValueError("failure"), line_offset=3),
-        error_formatter=error_only_formatter,
-        max_error=100,
-    )
-
-    assert dto.error is not None
-    assert dto.error.formatted_error == "error-only worker diagnostic"
-    assert len(calls) == 1
-    assert isinstance(calls[0], ValueError)
-    assert str(calls[0]) == "failure"
-
-
-def test_worker_formatter_receives_supported_optional_keyword_subset() -> None:
-    calls = []
-
-    def partial_formatter(error: Exception, *, tail_chars: int | None = None) -> str:
-        calls.append((error, tail_chars))
-        return f"partial worker diagnostic with tail {tail_chars}"
-
-    dto = result_to_dto(
-        _result_with_error(ValueError("failure"), line_offset=3),
-        error_formatter=partial_formatter,
+        error_formatter=formatter,
         max_error=100,
         tail_chars=17,
     )
 
     assert dto.error is not None
-    assert dto.error.formatted_error == "partial worker diagnostic with tail 17"
+    assert dto.error.formatted_error == "worker diagnostic with tail 17"
     assert len(calls) == 1
-    assert isinstance(calls[0][0], ValueError)
-    assert calls[0][1] == 17
-
-
-def test_legacy_worker_formatter_remains_supported_with_configured_limit() -> None:
-    calls = []
-
-    def legacy_formatter(error: Exception, *, line_offset: int = 0) -> str:
-        calls.append((error, line_offset))
-        return "legacy worker diagnostic"
-
-    dto = result_to_dto(
-        _result_with_error(ValueError("failure"), line_offset=3),
-        error_formatter=legacy_formatter,
-        max_error=100,
-    )
-
-    assert dto.error is not None
-    assert dto.error.formatted_error == "legacy worker diagnostic"
-    assert len(calls) == 1
-    assert isinstance(calls[0][0], ValueError)
-    assert calls[0][1] == 3
+    error, code, line_offset, formatted_error, max_error, tail_chars = calls[0]
+    assert isinstance(error, ValueError)
+    assert str(error) == "failure"
+    assert code is None
+    assert line_offset == 3
+    assert formatted_error == ""
+    assert max_error == 100
+    assert tail_chars == 17
 
 
 def test_formatter_failure_does_not_destroy_worker_error(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -246,10 +220,12 @@ def test_error_dto_text_respects_configured_capture_limit_before_transport_limit
     assert len(dto.error.message) <= max_error + 1_024
 
 
-def test_legacy_formatter_output_respects_configured_capture_limit() -> None:
+def test_worker_formatter_output_respects_configured_capture_limit() -> None:
     dto = result_to_dto(
         _result_with_error(RuntimeError("failure")),
-        error_formatter=lambda error, *, line_offset=0: "L" * 1_000,
+        error_formatter=lambda error, code=None, *, line_offset=0, formatted_error="", max_error=None, tail_chars=None: (
+            "L" * 1_000
+        ),
         max_error=100,
     )
 
@@ -259,7 +235,15 @@ def test_legacy_formatter_output_respects_configured_capture_limit() -> None:
 
 
 def test_formatter_failure_fallback_respects_configured_capture_limit() -> None:
-    def broken_formatter(error: Exception, *, line_offset: int = 0) -> str:
+    def broken_formatter(
+        error: Exception,
+        code: str | None = None,
+        *,
+        line_offset: int = 0,
+        formatted_error: str = "",
+        max_error: int | None = None,
+        tail_chars: int | None = None,
+    ) -> str:
         raise RuntimeError("formatter failed")
 
     dto = result_to_dto(
@@ -290,7 +274,9 @@ def test_larger_preformatted_envelope_is_rebounded_for_active_budget() -> None:
     larger = format_error_for_llm(RuntimeError("X" * 2_000), max_error=400)
     dto = result_to_dto(
         _result_with_error(RuntimeError("surrogate")),
-        error_formatter=lambda error, *, line_offset=0: larger,
+        error_formatter=lambda error, code=None, *, line_offset=0, formatted_error="", max_error=None, tail_chars=None: (
+            larger
+        ),
         max_error=100,
     )
 

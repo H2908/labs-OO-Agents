@@ -200,9 +200,19 @@ async def test_custom_formatter_receives_worker_rendered_diagnostic():
     """Custom formatters run parent-side and can consume the worker traceback."""
 
     class TransportFormatter:
-        def format(self, error, code=None, *, line_offset=0, formatted_error=""):
+        def format(
+            self,
+            error,
+            code=None,
+            *,
+            line_offset=0,
+            formatted_error="",
+            max_error=None,
+            tail_chars=None,
+        ):
             assert isinstance(error, ValueError)
             assert line_offset > 0
+            assert max_error is not None
             return "CUSTOM\n" + formatted_error
 
     class CustomAgent(Agent, llm=FakeLLMClient()):

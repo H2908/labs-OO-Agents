@@ -519,8 +519,8 @@ class ErrorFormatter(Protocol):
     """Preferred strategy formatter contract.
 
     Implementations receive trusted backend-rendered diagnostics and the resolved
-    per-call error budget. Strategies retain compatibility with older formatters,
-    but new implementations should accept the complete keyword-only contract.
+    per-call error budget. Custom strategy formatters must implement this complete
+    contract.
     """
 
     def format(
