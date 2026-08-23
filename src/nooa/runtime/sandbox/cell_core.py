@@ -114,6 +114,7 @@ async def run_cell_source(
     defined_methods: dict[str, Any] = {}
     try:
         with contextlib.redirect_stdout(stdout_buf), contextlib.redirect_stderr(stderr_buf):
+            source_code = code
             try:
                 tree = ast.parse(code, filename=cell_filename)
             except SyntaxError as exc:
@@ -206,6 +207,15 @@ async def run_cell_source(
                 exec(
                     compile(ast.Module(body=func_defs, type_ignores=[]), cell_filename, "exec"),
                     namespace,
+                )
+                # Persisted helpers are compiled directly from the cell AST, not
+                # through the async wrapper. Keep their source cache aligned with
+                # those original line numbers for later-cell tracebacks.
+                linecache.cache[cell_filename] = (
+                    len(source_code),
+                    None,
+                    source_code.splitlines(keepends=True),
+                    cell_filename,
                 )
             for name, src in method_sources.items():
                 fn = namespace.get(name)

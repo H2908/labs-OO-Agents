@@ -1564,6 +1564,7 @@ class ActorRuntime:
             cell_filename = f"Cell In[{execution_count}]"
 
             # Parse AST to find method definitions
+            source_code = code
             try:
                 tree = ast.parse(code, filename=cell_filename)
             except SyntaxError as e:
@@ -1708,6 +1709,22 @@ class ActorRuntime:
                     if func_defs:
                         func_tree = ast.Module(body=func_defs, type_ignores=[])
                         exec(compile(func_tree, cell_filename, "exec"), exec_globals)
+                        # Persisted helpers are compiled directly from the cell
+                        # AST, not through the async wrapper. Keep their source
+                        # cache aligned with those original line numbers.
+                        linecache.cache[cell_filename] = (
+                            len(source_code),
+                            None,
+                            source_code.splitlines(keepends=True),
+                            cell_filename,
+                        )
+                        # The wrapper's finally block captured the wrapped
+                        # function objects. Persist the direct-compiled versions
+                        # instead so later calls use source-relative line numbers.
+                        for node in func_defs:
+                            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                                if node.name in exec_globals:
+                                    captured_locals[node.name] = exec_globals[node.name]
 
                     # Attach source code to defined functions for has_ellipsis_body() detection
                     for method_name, method_code in method_sources.items():

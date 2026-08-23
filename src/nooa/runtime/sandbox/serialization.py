@@ -112,6 +112,7 @@ class SignalDTO:
     """Picklable surrogate for a ``return_result()`` control-flow signal."""
 
     result: Any
+    result_is_pickled: bool = False
 
 
 @dataclass
@@ -123,6 +124,7 @@ class ResultDTO:
     error: ErrorDTO | None = None
     signal: SignalDTO | None = None
     returned_value: Any = None
+    returned_value_is_pickled: bool = False
     has_return: bool = False
     explicit_return: bool = False
     images: list[dict[str, Any]] = field(default_factory=list)
@@ -194,6 +196,8 @@ def result_to_dto(
                 max_error=effective_max_error,
                 tail_chars=tail_chars,
             )
+            if type(formatted_error) is not str:
+                raise TypeError("error formatter must return str")
         except BaseException:
             formatted_error = f"{error_type}: {message}"
 
@@ -214,9 +218,9 @@ def result_to_dto(
 
     if result.signal is not None:
         payload = getattr(result.signal, "result", None)
-        if is_picklable(payload):
-            dto.signal = SignalDTO(result=payload)
-        else:
+        try:
+            pickled_payload = pickle.dumps(payload)
+        except BaseException:
             dto.error = ErrorDTO(
                 type_name="CellSerializationError",
                 message=(
@@ -225,15 +229,15 @@ def result_to_dto(
                     "(numbers, str, list, dict, ndarray) instead."
                 ),
             )
+        else:
+            dto.signal = SignalDTO(result=pickled_payload, result_is_pickled=True)
         return dto
 
     rv = result.returned_value
     if rv is not _NO_RETURN:
-        if is_picklable(rv):
-            dto.returned_value = rv
-            dto.has_return = True
-            dto.explicit_return = bool(result.explicit_return)
-        else:
+        try:
+            pickled_return = pickle.dumps(rv)
+        except BaseException:
             dto.error = ErrorDTO(
                 type_name="CellSerializationError",
                 message=(
@@ -242,6 +246,11 @@ def result_to_dto(
                     "return a JSON/pickle-safe summary instead."
                 ),
             )
+        else:
+            dto.returned_value = pickled_return
+            dto.returned_value_is_pickled = True
+            dto.has_return = True
+            dto.explicit_return = bool(result.explicit_return)
     return dto
 
 
@@ -297,8 +306,27 @@ def dto_to_result(dto: ResultDTO, *, signal_factory: Any = None) -> Any:
         error = _reconstruct_error(dto.error)
 
     signal = None
-    if dto.signal is not None and signal_factory is not None:
-        signal = signal_factory(dto.signal.result)
+    returned_value: Any = _NO_RETURN
+    try:
+        if dto.signal is not None and signal_factory is not None:
+            signal_payload = (
+                pickle.loads(dto.signal.result)
+                if getattr(dto.signal, "result_is_pickled", False)
+                else dto.signal.result
+            )
+            signal = signal_factory(signal_payload)
+        if dto.has_return:
+            returned_value = (
+                pickle.loads(dto.returned_value)
+                if getattr(dto, "returned_value_is_pickled", False)
+                else dto.returned_value
+            )
+    except BaseException:
+        error = CellSerializationError(
+            "A sandbox result could not be deserialized across the process boundary."
+        )
+        signal = None
+        returned_value = _NO_RETURN
 
     return ExecutionResult(
         stdout=dto.stdout,
@@ -307,7 +335,7 @@ def dto_to_result(dto: ResultDTO, *, signal_factory: Any = None) -> Any:
         formatted_error=dto.error.formatted_error if dto.error is not None else "",
         signal=signal,
         defined_methods={},
-        returned_value=dto.returned_value if dto.has_return else _NO_RETURN,
+        returned_value=returned_value,
         explicit_return=dto.explicit_return,
         captured_locals={},
         images=dto.images,

@@ -5,12 +5,14 @@
 from __future__ import annotations
 
 import asyncio
+import pickle
 
 import pytest
 
 from nooa.config.truncation_config import DEFAULT_TRUNCATION_CONFIG
 from nooa.errors.formatting import format_error_for_llm
 from nooa.events import _NO_RETURN, ExecutionResult, ExecutionSignal
+from nooa.runtime.sandbox.cell_core import run_cell_source
 from nooa.runtime.sandbox.errors import (
     CellMemoryError,
     CellSerializationError,
@@ -22,6 +24,7 @@ from nooa.runtime.sandbox.readonly import SandboxStateError
 from nooa.runtime.sandbox.serialization import (
     ErrorDTO,
     ResultDTO,
+    SignalDTO,
     _SurrogateCellError,
     dto_to_result,
     result_to_dto,
@@ -30,6 +33,23 @@ from nooa.runtime.sandbox.serialization import (
 
 def _result_with_error(error: Exception, *, line_offset: int = 0) -> ExecutionResult:
     return ExecutionResult(error=error, wrapper_line_offset=line_offset)
+
+
+class _PicklesOnlyOnce:
+    """Value whose reducer fails if transport tries to serialize it twice."""
+
+    calls = 0
+
+    def __reduce__(self):
+        type(self).calls += 1
+        if type(self).calls > 1:
+            raise RuntimeError("second pickle explodes")
+        return str, ("serialized once",)
+
+
+class SignalWithResult(ExecutionSignal):
+    def __init__(self, result: object) -> None:
+        self.result = result
 
 
 def test_builtin_exception_reconstruction_keeps_worker_diagnostic() -> None:
@@ -87,6 +107,50 @@ def test_syntax_error_keeps_formatted_source_and_caret() -> None:
     assert diagnostic.endswith("SyntaxError: invalid syntax")
 
 
+@pytest.mark.asyncio
+async def test_worker_system_exit_keeps_adjusted_source_context() -> None:
+    source = "marker = 1\nraise SystemExit('bye')"
+    result = await run_cell_source(source, {}, execution_count=70)
+
+    assert result.error is not None
+    formatted = format_error_for_llm(
+        result.error,
+        source,
+        line_offset=result.wrapper_line_offset,
+    )
+    assert "Cell In[70], line 2" in formatted
+    assert "raise SystemExit('bye')" in formatted
+    assert "SystemExit: bye" in formatted
+    assert "direct cause" in formatted
+    assert formatted.endswith(
+        "RuntimeError: SystemExit raised inside generated code. Use return_result() "
+        "or a normal return to finish a cell, not sys.exit()/exit()/quit()."
+    )
+
+
+@pytest.mark.asyncio
+async def test_persisted_worker_helper_keeps_original_source_location() -> None:
+    namespace: dict[str, object] = {}
+    helper_source = """def boom():
+    marker = "helper"
+    raise ValueError("x")
+"""
+    await run_cell_source(helper_source, namespace, execution_count=71)
+    namespace["persisted"] = 1
+
+    failed = await run_cell_source("boom()", namespace, execution_count=73)
+
+    assert failed.error is not None
+    formatted = format_error_for_llm(
+        failed.error,
+        "boom()",
+        line_offset=failed.wrapper_line_offset,
+    )
+    assert "Cell In[73], line 1" in formatted
+    assert "Cell In[71], line 3, in boom" in formatted
+    assert 'raise ValueError("x")' in formatted
+
+
 def test_worker_formatter_receives_complete_context() -> None:
     calls = []
 
@@ -137,6 +201,33 @@ def test_formatter_failure_does_not_destroy_worker_error(monkeypatch: pytest.Mon
         message="original failure",
         formatted_error="ValueError: original failure",
     )
+
+
+class _HostileString(str):
+    def rstrip(self, chars: str | None = None) -> str:
+        raise RuntimeError("hostile rstrip")
+
+
+@pytest.mark.parametrize("invalid_result", [None, 123, b"bytes", _HostileString("text")])
+def test_non_string_formatter_result_uses_safe_fallback(invalid_result: object) -> None:
+    def invalid_formatter(
+        error: Exception,
+        code: str | None = None,
+        *,
+        line_offset: int = 0,
+        formatted_error: str = "",
+        max_error: int | None = None,
+        tail_chars: int | None = None,
+    ) -> str:
+        return invalid_result  # type: ignore[return-value]
+
+    dto = result_to_dto(
+        _result_with_error(ValueError("original failure")),
+        error_formatter=invalid_formatter,
+    )
+
+    assert dto.error is not None
+    assert dto.error.formatted_error == "ValueError: original failure"
 
 
 def test_worker_uses_formatter_captured_before_cell_module_mutation() -> None:
@@ -324,6 +415,52 @@ def test_base_exception_from_exception_string_does_not_escape_serialization(rais
     assert dto.error is not None
     assert dto.error.message == "BrokenStringError"
     assert dto.error.formatted_error == "BrokenStringError: BrokenStringError"
+
+
+def test_ordinary_return_is_pickled_only_once_before_transport() -> None:
+    _PicklesOnlyOnce.calls = 0
+    dto = result_to_dto(ExecutionResult(returned_value=_PicklesOnlyOnce()))
+
+    transported_dto = pickle.loads(pickle.dumps(dto))
+    result = dto_to_result(transported_dto)
+
+    assert _PicklesOnlyOnce.calls == 1
+    assert result.returned_value == "serialized once"
+
+
+def test_return_result_payload_is_pickled_only_once_before_transport() -> None:
+    class Signal(ExecutionSignal):
+        def __init__(self) -> None:
+            self.result = _PicklesOnlyOnce()
+
+    _PicklesOnlyOnce.calls = 0
+    dto = result_to_dto(ExecutionResult(signal=Signal()))
+
+    transported_dto = pickle.loads(pickle.dumps(dto))
+    result = dto_to_result(
+        transported_dto,
+        signal_factory=lambda value: SignalWithResult(value),
+    )
+
+    assert _PicklesOnlyOnce.calls == 1
+    assert result.signal is not None
+    assert result.signal.result == "serialized once"
+
+
+def test_legacy_unencoded_return_dto_still_decodes() -> None:
+    result = dto_to_result(ResultDTO(returned_value={"answer": 42}, has_return=True))
+
+    assert result.error is None
+    assert result.returned_value == {"answer": 42}
+
+
+def test_legacy_unencoded_signal_dto_still_decodes() -> None:
+    dto = ResultDTO(signal=SignalDTO(result={"answer": 42}))
+    result = dto_to_result(dto, signal_factory=lambda value: SignalWithResult(value))
+
+    assert result.error is None
+    assert result.signal is not None
+    assert result.signal.result == {"answer": 42}
 
 
 def test_unpicklable_ordinary_return_becomes_serialization_error() -> None:

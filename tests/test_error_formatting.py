@@ -487,20 +487,41 @@ class TestIPythonErrorFormatter:
         result = formatter.format(error, None, line_offset=5)
         assert "ValueError" in result
 
-    def test_custom_formatter_compatibility(self):
-        """Custom formatters can be created with same interface."""
+    def test_custom_formatter_matches_complete_protocol(self):
+        """Custom formatters can implement the complete public protocol."""
 
         class CustomFormatter:
             def format(
-                self, error: Exception, _code: str | None = None, *, line_offset: int = 0
+                self,
+                error: Exception,
+                code: str | None = None,
+                *,
+                line_offset: int = 0,
+                formatted_error: str = "",
+                max_error: int | None = None,
+                tail_chars: int | None = None,
             ) -> str:
-                # _code intentionally unused - testing interface compatibility
-                return f"CUSTOM: {type(error).__name__} (offset={line_offset})"
+                return (
+                    f"CUSTOM: {type(error).__name__} "
+                    f"({code=}, {line_offset=}, {formatted_error=}, "
+                    f"{max_error=}, {tail_chars=})"
+                )
+
+        from nooa.strategies.codeact import CodeActStrategy
 
         formatter = CustomFormatter()
-        error = ValueError("test")
-        result = formatter.format(error, None, line_offset=3)
-        assert result == "CUSTOM: ValueError (offset=3)"
+        result = CodeActStrategy(error_formatter=formatter)._format_error(
+            ValueError("test"),
+            "bad()",
+            line_offset=3,
+            formatted_error="ValueError: test",
+            max_error=100,
+            tail_chars=25,
+        )
+        assert result == (
+            "CUSTOM: ValueError (code='bad()', line_offset=3, "
+            "formatted_error='ValueError: test', max_error=100, tail_chars=25)"
+        )
 
 
 class TestHeredocHint:

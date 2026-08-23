@@ -362,6 +362,37 @@ def _concise_exception(error: BaseException) -> str:
     return f"{name}: {message}" if message else name
 
 
+def _wrapper_cell_filename(
+    error: BaseException,
+    seen: set[int] | None = None,
+) -> str | None:
+    """Find the generated-cell wrapper frame anywhere in an exception tree."""
+    if seen is None:
+        seen = set()
+    if id(error) in seen:
+        return None
+    seen.add(id(error))
+
+    traceback_cursor = error.__traceback__
+    while traceback_cursor is not None:
+        frame_code = traceback_cursor.tb_frame.f_code
+        if frame_code.co_name in _WRAPPER_NAMES and _CELL_PATTERN.match(frame_code.co_filename):
+            return frame_code.co_filename
+        traceback_cursor = traceback_cursor.tb_next
+
+    for related in (error.__cause__, error.__context__):
+        if related is not None:
+            filename = _wrapper_cell_filename(related, seen)
+            if filename is not None:
+                return filename
+    if isinstance(error, BaseExceptionGroup):
+        for child in error.exceptions:
+            filename = _wrapper_cell_filename(child, seen)
+            if filename is not None:
+                return filename
+    return None
+
+
 def _format_runtime_error(error: BaseException) -> str:
     """Render a filtered runtime diagnostic with Python's traceback formatter."""
     if (
@@ -380,14 +411,31 @@ def _format_runtime_error(error: BaseException) -> str:
     return "".join(diagnostic.format(chain=True))
 
 
-def _adjust_line_numbers(text: str, offset: int, *, cell_only: bool = False) -> str:
-    """Adjust traceback-header line numbers without rewriting source/messages."""
+def _adjust_line_numbers(
+    text: str,
+    offset: int,
+    *,
+    cell_only: bool = False,
+    cell_filename: str | None = None,
+) -> str:
+    """Adjust matching traceback headers without rewriting source/messages.
+
+    ``cell_filename`` limits adjustment to the currently wrapped cell. Persisted
+    helpers are compiled from their original source, so frames from older cells
+    already have source-relative line numbers and must not inherit the current
+    cell's wrapper offset.
+    """
     if offset <= 0:
         return text
 
     # Headers are the only lines that should change. In particular, source such
     # as ``# line 99`` and messages such as ``failed at line 12`` are verbatim.
-    prefix = r" *Cell In\[\d+\], " if cell_only else r'(?: *File "[^"]+", | *Cell In\[\d+\], |)'
+    if cell_filename is not None:
+        prefix = rf" *{re.escape(cell_filename)}, "
+    elif cell_only:
+        prefix = r" *Cell In\[\d+\], "
+    else:
+        prefix = r'(?: *File "[^"]+", | *Cell In\[\d+\], |)'
     header = re.compile(
         rf"(?m)^(?P<prefix>{prefix}line )"
         r"(?P<number>\d+)(?P<suffix>(?:, in .*)?)$"
@@ -632,7 +680,13 @@ class IPythonErrorFormatter:
     def _format_runtime_error(self, error: BaseException, line_offset: int) -> str:
         """Format runtime errors using the stdlib traceback implementation."""
         formatted = _strip_file_prefix(_format_runtime_error(error))
-        formatted = _adjust_line_numbers(formatted, line_offset, cell_only=True)
+        current_cell = _wrapper_cell_filename(error)
+        formatted = _adjust_line_numbers(
+            formatted,
+            line_offset,
+            cell_only=current_cell is None,
+            cell_filename=current_cell,
+        )
         return _replace_wrapper_names(formatted).rstrip()
 
 
