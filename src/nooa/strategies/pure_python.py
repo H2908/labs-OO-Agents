@@ -38,6 +38,7 @@ from nooa.events import (
     Task,
 )
 from nooa.runtime.harness_metrics import get_harness_metrics
+from nooa.runtime.sandbox.errors import SandboxExecutionError
 from nooa.strategies.base import RuntimeServices
 from nooa.strategies.codeact_errors import format_validation_error
 from nooa.strategies.composite import CompositeStrategy
@@ -414,9 +415,12 @@ class PurePythonStrategy(CompositeStrategy):
                         result.stderr,
                         execution_count=session.execution_count,
                         line_offset=getattr(result, "wrapper_line_offset", 0),
-                        formatted_error=result.formatted_error,
                     )
-                    turn_exception = type(result.error).__name__
+                    turn_exception = (
+                        result.error.original_type
+                        if isinstance(result.error, SandboxExecutionError)
+                        else type(result.error).__name__
+                    )
                     continue
 
                 session.record_iteration()
@@ -559,7 +563,6 @@ class PurePythonStrategy(CompositeStrategy):
                 result.stderr,
                 execution_count=0,
                 line_offset=getattr(result, "wrapper_line_offset", 0),
-                formatted_error=result.formatted_error,
                 metadata={"prefill": True, "prefill_type": "inspect_inputs"},
             )
             # Prefill errors are visible to the LLM but remain non-fatal.
@@ -877,7 +880,6 @@ class PurePythonStrategy(CompositeStrategy):
         *,
         execution_count: int = 0,
         line_offset: int = 0,
-        formatted_error: str = "",
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Emit a failed cell through the shared structured output contract."""
@@ -885,7 +887,6 @@ class PurePythonStrategy(CompositeStrategy):
             error,
             code,
             line_offset=line_offset,
-            formatted_error=formatted_error,
             max_error=runtime.truncation_config.capture.max_error,
             tail_chars=runtime.truncation_config.capture.tail,
         )
@@ -1077,7 +1078,6 @@ class PurePythonStrategy(CompositeStrategy):
         code: str | None = None,
         *,
         line_offset: int = 0,
-        formatted_error: str = "",
         max_error: int | None = None,
         tail_chars: int | None = None,
     ) -> str:
@@ -1088,7 +1088,6 @@ class PurePythonStrategy(CompositeStrategy):
             error,
             code,
             line_offset=line_offset,
-            formatted_error=formatted_error,
             max_error=max_error,
             tail_chars=tail_chars,
         )

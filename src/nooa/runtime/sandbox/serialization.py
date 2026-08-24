@@ -23,12 +23,8 @@ from typing import Any, Protocol
 
 from nooa.agentdoc import TruncatingStringIO
 from nooa.config.truncation_config import DEFAULT_TRUNCATION_CONFIG
-from nooa.errors.formatting import (
-    _bound_preformatted_diagnostic,
-    _diagnostic_budget,
-    _hard_bound_text,
-)
-from nooa.runtime.sandbox.errors import CellSerializationError
+from nooa.errors.formatting import _diagnostic_budget, _hard_bound_text
+from nooa.runtime.sandbox.errors import CellSerializationError, SandboxExecutionError
 
 # ``TruncatingStringIO`` adds a human-readable envelope around retained
 # head/tail content. Sandbox IPC has a fixed safety ceiling independent of a
@@ -46,7 +42,6 @@ class _ErrorFormatter(Protocol):
         code: str | None = None,
         *,
         line_offset: int = 0,
-        formatted_error: str = "",
         max_error: int | None = None,
         tail_chars: int | None = None,
     ) -> str: ...
@@ -78,16 +73,15 @@ def _bounded_error_message(
     return _hard_bound_text(stream.getvalue(), _MAX_ERROR_TRANSPORT)
 
 
-def _bounded_formatted_error(
-    value: str,
-    *,
-    max_error: int | None = None,
-    tail_chars: int | None = None,
-) -> str:
-    """Apply capture policy once and enforce a fixed IPC ceiling."""
+def _bounded_diagnostic(value: str, *, max_error: int | None = None) -> str:
+    """Enforce the IPC ceiling after the worker formatter applies capture policy."""
     content_limit = effective_error_limit(max_error)
-    bounded = _bound_preformatted_diagnostic(value, content_limit, tail_chars)
-    return _hard_bound_text(bounded, min(_MAX_ERROR_TRANSPORT, content_limit + 1_024))
+    transport_limit = min(_MAX_ERROR_TRANSPORT, content_limit + 1_024)
+    return _hard_bound_text(
+        value.rstrip(),
+        transport_limit,
+        closing="\n</truncated-output>",
+    )
 
 
 def is_picklable(value: Any) -> bool:
@@ -104,7 +98,7 @@ class ErrorDTO:
 
     type_name: str
     message: str
-    formatted_error: str = ""
+    diagnostic: str = ""
 
 
 @dataclass
@@ -128,22 +122,6 @@ class ResultDTO:
     images: list[dict[str, Any]] = field(default_factory=list)
     wrapper_line_offset: int = 0
     defined_method_names: list[str] = field(default_factory=list)
-
-
-class _SurrogateCellError(Exception):
-    """Parent-side reconstruction of a worker exception.
-
-    Preserves the original type name. The worker-rendered diagnostic remains
-    separate in :attr:`ErrorDTO.formatted_error` and is copied to the parent
-    ``ExecutionResult.formatted_error`` by :func:`dto_to_result`.
-    """
-
-    def __init__(self, dto: ErrorDTO):
-        super().__init__(dto.message)
-        self.original_type = dto.type_name
-
-    def __str__(self) -> str:
-        return self.args[0] if self.args else self.original_type
 
 
 def result_to_dto(
@@ -186,18 +164,17 @@ def result_to_dto(
 
         effective_max_error = effective_error_limit(max_error)
         try:
-            formatted_error = error_formatter(
+            diagnostic = error_formatter(
                 err,
                 None,
                 line_offset=getattr(result, "wrapper_line_offset", 0),
-                formatted_error="",
                 max_error=effective_max_error,
                 tail_chars=tail_chars,
             )
-            if type(formatted_error) is not str:
+            if type(diagnostic) is not str:
                 raise TypeError("error formatter must return str")
         except BaseException:
-            formatted_error = f"{error_type}: {message}"
+            diagnostic = f"{error_type}: {message}"
 
         dto.error = ErrorDTO(
             type_name=error_type,
@@ -206,10 +183,9 @@ def result_to_dto(
                 max_error=effective_max_error,
                 tail_chars=tail_chars,
             ),
-            formatted_error=_bounded_formatted_error(
-                formatted_error,
+            diagnostic=_bounded_diagnostic(
+                diagnostic,
                 max_error=effective_max_error,
-                tail_chars=tail_chars,
             ),
         )
         return dto
@@ -252,41 +228,39 @@ def result_to_dto(
 
 
 def _reconstruct_error(err: ErrorDTO) -> Exception:
-    """Rebuild a parent-side exception from an :class:`ErrorDTO`.
-
-    Common builtin exceptions (ValueError, KeyError, MemoryError, ...) are
-    re-instantiated as their real type so ``_format_error`` and the IPython
-    formatter render the faithful ``<Type>: <message>``. The worker-rendered
-    diagnostic remains in :attr:`ErrorDTO.formatted_error`; it is not attached to
-    the exception. Anything else falls back to :class:`_SurrogateCellError`.
-    """
+    """Rebuild an exception and wrap worker diagnostics in a typed boundary."""
     import builtins as _bi
 
     if err.type_name == "CellSerializationError":
-        exc: Exception = CellSerializationError(err.message)
+        original: Exception = CellSerializationError(err.message)
     elif err.type_name == "SandboxStateError":
-        # A cell tried to mutate non-self module-level state; reconstruct the real
-        # type (the parent has it) so callers see SandboxStateError, not a surrogate.
         from nooa.runtime.sandbox.readonly import SandboxStateError
 
         prefix = "SandboxStateError: "
-        msg = err.message[len(prefix) :] if err.message.startswith(prefix) else err.message
-        exc = SandboxStateError(msg)
+        message = err.message[len(prefix) :] if err.message.startswith(prefix) else err.message
+        original = SandboxStateError(message)
     else:
         cls = getattr(_bi, err.type_name, None)
         if isinstance(cls, type) and issubclass(cls, Exception):
             try:
-                # Strip a leading "Type: " the message may already carry.
-                msg = err.message
+                message = err.message
                 prefix = f"{err.type_name}: "
-                if msg.startswith(prefix):
-                    msg = msg[len(prefix) :]
-                exc = cls(msg)
+                if message.startswith(prefix):
+                    message = message[len(prefix) :]
+                original = cls(message)
             except Exception:
-                exc = _SurrogateCellError(err)
+                original = Exception(err.message)
         else:
-            exc = _SurrogateCellError(err)
-    return exc
+            original = Exception(err.message)
+
+    if not err.diagnostic:
+        return original
+    return SandboxExecutionError(
+        original_type=err.type_name,
+        message=err.message,
+        diagnostic=err.diagnostic,
+        original_error=original,
+    )
 
 
 def dto_to_result(dto: ResultDTO, *, signal_factory: Any = None) -> Any:
@@ -320,7 +294,6 @@ def dto_to_result(dto: ResultDTO, *, signal_factory: Any = None) -> Any:
         stdout=dto.stdout,
         stderr=dto.stderr,
         error=error,
-        formatted_error=dto.error.formatted_error if dto.error is not None else "",
         signal=signal,
         defined_methods={},
         returned_value=returned_value,

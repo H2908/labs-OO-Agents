@@ -190,9 +190,12 @@ async def test_brokered_bad_call_preserves_parent_signature_hint():
     try:
         code = "self.add_one(value=41)"
         res = await _run(ex, code, 88)
-        assert isinstance(res.error, TypeError)
+        from nooa.runtime.sandbox.errors import SandboxExecutionError
 
-        diagnostic = format_error_for_llm(res.error, code, formatted_error=res.formatted_error)
+        assert isinstance(res.error, SandboxExecutionError)
+        assert isinstance(res.error.original_error, TypeError)
+
+        diagnostic = format_error_for_llm(res.error, code)
         assert "Cell In[88], line 1" in diagnostic
         assert code in diagnostic
         assert "unexpected keyword argument 'value'" in diagnostic
@@ -418,7 +421,7 @@ async def test_broken_exception_string_crosses_real_worker_and_worker_recovers()
             73,
         )
         assert not res.success
-        assert res.formatted_error.endswith("BrokenStringError: <exception str() failed>")
+        assert res.error.diagnostic.endswith("BrokenStringError: <exception str() failed>")
 
         recovered = await _run(ex, "40 + 2", 74)
         assert recovered.success
@@ -439,9 +442,9 @@ async def test_explicit_exception_chain_crosses_real_worker():
         res = await _run(ex, code, 74)
 
         assert not res.success
-        assert "KeyError: 'inner'" in res.formatted_error
-        assert "The above exception was the direct cause" in res.formatted_error
-        assert res.formatted_error.endswith("RuntimeError: outer")
+        assert "KeyError: 'inner'" in res.error.diagnostic
+        assert "The above exception was the direct cause" in res.error.diagnostic
+        assert res.error.diagnostic.endswith("RuntimeError: outer")
     finally:
         await ex.aclose()
 
@@ -456,9 +459,9 @@ async def test_exception_group_crosses_real_worker():
         )
 
         assert not res.success
-        assert "ExceptionGroup: many (2 sub-exceptions)" in res.formatted_error
-        assert "ValueError: one" in res.formatted_error
-        assert "TypeError: two" in res.formatted_error
+        assert "ExceptionGroup: many (2 sub-exceptions)" in res.error.diagnostic
+        assert "ValueError: one" in res.error.diagnostic
+        assert "TypeError: two" in res.error.diagnostic
     finally:
         await ex.aclose()
 
@@ -471,9 +474,12 @@ async def test_syntax_error_preserves_cell_filename_across_process():
     try:
         code = "value = (1 + )"
         res = await _run(ex, code, 76)
-        assert isinstance(res.error, SyntaxError)
+        from nooa.runtime.sandbox.errors import SandboxExecutionError
 
-        formatted = format_error_for_llm(res.error, code, formatted_error=res.formatted_error)
+        assert isinstance(res.error, SandboxExecutionError)
+        assert isinstance(res.error.original_error, SyntaxError)
+
+        formatted = format_error_for_llm(res.error, code)
         assert "Cell In[76], line 1" in formatted
         assert "<unknown>" not in formatted
         assert formatted.endswith("SyntaxError: invalid syntax")
@@ -495,7 +501,6 @@ async def test_cell_error_preserves_source_location_across_process():
             res.error,
             code,
             line_offset=res.wrapper_line_offset,
-            formatted_error=res.formatted_error,
         )
 
         assert "Cell In[75], line 4" in formatted
@@ -679,7 +684,7 @@ async def test_worker_error_uses_executor_error_budget():
         result = await _run(ex, "raise RuntimeError('x' * 1_000)")
 
         assert result.error is not None
-        assert "Showing first 50 and last 50 chars" in result.formatted_error
+        assert "Showing first 50 and last 50 chars" in result.error.diagnostic
     finally:
         await ex.aclose()
 

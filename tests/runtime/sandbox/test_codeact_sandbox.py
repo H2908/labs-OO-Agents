@@ -206,14 +206,16 @@ async def test_custom_formatter_receives_worker_rendered_diagnostic():
             code=None,
             *,
             line_offset=0,
-            formatted_error="",
             max_error=None,
             tail_chars=None,
         ):
-            assert isinstance(error, ValueError)
+            from nooa.runtime.sandbox.errors import SandboxExecutionError
+
+            assert isinstance(error, SandboxExecutionError)
+            assert isinstance(error.original_error, ValueError)
             assert line_offset > 0
             assert max_error is not None
-            return "CUSTOM\n" + formatted_error
+            return "CUSTOM\n" + error.diagnostic
 
     class CustomAgent(Agent, llm=FakeLLMClient()):
         @strategy(

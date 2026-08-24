@@ -5,7 +5,8 @@
 from unittest.mock import MagicMock
 
 from nooa import Agent
-from nooa.events import LLMOutput, Task
+from nooa.context_blocks import ResultStatus
+from nooa.events import LLMOutput, PythonOutput, Task
 from nooa.runtime.event_manager import EventManager
 from nooa.runtime.events import EventsApi
 from nooa.unifiedllm import FakeLLMClient
@@ -222,6 +223,32 @@ class TestEventManagerQuery:
         assert recent[0].prompt == "Message 2"
         assert recent[2].prompt == "Message 4"
 
+    def test_filter_nonpositive_limit_returns_no_events(self):
+        manager = EventManager()
+        manager.add(Task(prompt="one"))
+
+        assert manager.filter(limit=0) == []
+        assert manager.filter(limit=-1) == []
+
+    def test_filter_supports_backends_without_optional_iterator(self):
+        from nooa.runtime.event_backend import InMemoryBackend
+
+        class LegacyBackend:
+            def __init__(self) -> None:
+                self._delegate = InMemoryBackend()
+
+            def __getattr__(self, name):
+                if name == "iter_events":
+                    raise AttributeError(name)
+                return getattr(self._delegate, name)
+
+        manager = EventManager(backend=LegacyBackend())
+        manager.add(Task(prompt="old"))
+        manager.add(LLMOutput(content="middle"))
+        manager.add(Task(prompt="new"))
+
+        assert [event.prompt for event in manager.filter(type="Task", limit=1)] == ["new"]
+
     def test_filter_returns_all_if_less_than_limit(self):
         """filter(limit=n) should return all if fewer than n events."""
         manager = EventManager()
@@ -229,6 +256,36 @@ class TestEventManagerQuery:
 
         recent = manager.filter(limit=10)
         assert len(recent) == 1
+
+    def test_filter_by_execution_status_returns_recent_failures(self):
+        manager = EventManager()
+        manager.add(
+            PythonOutput(
+                tool_call_id="one",
+                execution_count=1,
+                execution_status=ResultStatus.ERROR,
+                error="first",
+            )
+        )
+        manager.add(
+            PythonOutput(
+                tool_call_id="two",
+                execution_count=2,
+                execution_status=ResultStatus.COMPLETE,
+            )
+        )
+        manager.add(
+            PythonOutput(
+                tool_call_id="three",
+                execution_count=3,
+                execution_status=ResultStatus.ERROR,
+                error="latest",
+            )
+        )
+
+        failures = manager.filter(type="PythonOutput", execution_status="error", limit=1)
+
+        assert [event.error for event in failures] == ["latest"]
 
     def test_filter_by_call_returns_events_with_call_id(self):
         """filter(call_id=...) should return events with that call_id."""

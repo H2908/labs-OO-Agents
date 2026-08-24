@@ -14,8 +14,8 @@ import itertools
 import logging
 import re
 from collections import defaultdict
-from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable, Iterable, Iterator
+from typing import TYPE_CHECKING, Any, cast
 
 from nooa.context_blocks import EventStatus
 from nooa.context_blocks.models import Role
@@ -353,6 +353,7 @@ class EventManager:
         *,
         type: str | None = None,
         call_id: str | None = None,
+        execution_status: str | None = None,
         query: str | None = None,
         regex: bool = False,
         limit: int | None = None,
@@ -362,6 +363,7 @@ class EventManager:
         Args:
             type: Event type filter (e.g., "Task", "PythonOutput")
             call_id: Call ID filter (matches metadata.call_id)
+            execution_status: PythonOutput status filter (e.g. "error" or "complete")
             query: Text search (case-insensitive substring, or regex if regex=True)
             regex: If True, treat query as regex pattern
             limit: Maximum results (most recent first when limit < total)
@@ -369,30 +371,49 @@ class EventManager:
         Returns:
             List of matching events.
         """
-        events = list(self._backend.all_events())
+        if limit is not None and limit <= 0:
+            return []
 
-        # Apply type filter
-        if type is not None:
-            events = [e for e in events if e.event_type == type]
+        newest_first = limit is not None
+        source: Iterable[EventBase]
+        iter_events = getattr(self._backend, "iter_events", None)
+        if newest_first and callable(iter_events):
+            optimized_iterator = cast(Callable[..., Iterator[EventBase]], iter_events)
+            source = optimized_iterator(event_type=type, newest_first=True)
+        else:
+            # ``iter_events`` is an optional optimization so existing custom
+            # EventBackend implementations remain compatible. Unlimited queries
+            # retain the backend's established snapshot behavior.
+            events = self._backend.all_events()
+            source = reversed(list(events)) if newest_first else events
+        matches: list[EventBase] = []
+        pattern = re.compile(query, re.IGNORECASE) if query is not None and regex else None
+        query_lower = query.lower() if query is not None and not regex else None
 
-        # Apply call_id filter
-        if call_id is not None:
-            events = [e for e in events if e.metadata.get("call_id") == call_id]
+        for event in source:
+            if type is not None and event.event_type != type:
+                continue
+            if call_id is not None and event.metadata.get("call_id") != call_id:
+                continue
+            if execution_status is not None:
+                status = getattr(event, "execution_status", None)
+                status_value = getattr(status, "value", status)
+                if status_value != execution_status:
+                    continue
+            if pattern is not None and not pattern.search(self._get_searchable_text(event)):
+                continue
+            if (
+                query_lower is not None
+                and query_lower not in self._get_searchable_text(event).lower()
+            ):
+                continue
+            matches.append(event)
+            if limit is not None and len(matches) >= limit:
+                break
 
-        # Apply text/regex filter
-        if query is not None:
-            if regex:
-                pattern = re.compile(query, re.IGNORECASE)
-                events = [e for e in events if pattern.search(self._get_searchable_text(e))]
-            else:
-                query_lower = query.lower()
-                events = [e for e in events if query_lower in self._get_searchable_text(e).lower()]
-
-        # Apply limit (from end = most recent)
-        if limit is not None and len(events) > limit:
-            events = events[-limit:]
-
-        return events
+        if newest_first:
+            matches.reverse()
+        return matches
 
     def _get_searchable_text(self, event: EventBase) -> str:
         """Extract searchable text from an event's public fields."""

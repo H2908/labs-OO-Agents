@@ -17,6 +17,8 @@ from nooa.runtime.sandbox.errors import (
     CellMemoryError,
     CellSerializationError,
     CellTimeoutError,
+    SandboxError,
+    SandboxExecutionError,
     WorkerDiedError,
 )
 from nooa.runtime.sandbox.executor import SandboxedExecutor
@@ -24,7 +26,6 @@ from nooa.runtime.sandbox.readonly import SandboxStateError
 from nooa.runtime.sandbox.serialization import (
     ErrorDTO,
     ResultDTO,
-    _SurrogateCellError,
     dto_to_result,
     result_to_dto,
 )
@@ -65,9 +66,11 @@ def test_builtin_exception_reconstruction_keeps_worker_diagnostic() -> None:
         )
     )
 
-    assert isinstance(result.error, ValueError)
-    assert result.formatted_error == diagnostic
-    assert format_error_for_llm(result.error, formatted_error=result.formatted_error) == diagnostic
+    assert isinstance(result.error, SandboxExecutionError)
+    assert not isinstance(result.error, SandboxError)
+    assert isinstance(result.error.original_error, ValueError)
+    assert result.error.original_type == "ValueError"
+    assert format_error_for_llm(result.error) == diagnostic
 
 
 def test_custom_exception_uses_surrogate_with_original_type_and_diagnostic() -> None:
@@ -81,12 +84,10 @@ def test_custom_exception_uses_surrogate_with_original_type_and_diagnostic() -> 
 
     result = dto_to_result(dto)
 
-    assert isinstance(result.error, _SurrogateCellError)
-    assert result.error.original_type == "DomainFailure"  # type: ignore[union-attr]
-    assert str(result.error) == "widget rejected"
-    assert format_error_for_llm(result.error, formatted_error=result.formatted_error).endswith(
-        "DomainFailure: widget rejected"
-    )
+    assert isinstance(result.error, SandboxExecutionError)
+    assert result.error.original_type == "DomainFailure"
+    assert str(result.error) == "DomainFailure: widget rejected"
+    assert format_error_for_llm(result.error).endswith("DomainFailure: widget rejected")
 
 
 def test_syntax_error_keeps_formatted_source_and_caret() -> None:
@@ -97,9 +98,10 @@ def test_syntax_error_keeps_formatted_source_and_caret() -> None:
         dto = result_to_dto(_result_with_error(error))
 
     result = dto_to_result(dto)
-    diagnostic = format_error_for_llm(result.error, formatted_error=result.formatted_error)
+    diagnostic = format_error_for_llm(result.error)
 
-    assert isinstance(result.error, SyntaxError)
+    assert isinstance(result.error, SandboxExecutionError)
+    assert isinstance(result.error.original_error, SyntaxError)
     assert "Cell In[12], line 1" in diagnostic
     assert source in diagnostic
     assert "^" in diagnostic
@@ -158,11 +160,10 @@ def test_worker_formatter_receives_complete_context() -> None:
         code: str | None = None,
         *,
         line_offset: int = 0,
-        formatted_error: str = "",
         max_error: int | None = None,
         tail_chars: int | None = None,
     ) -> str:
-        calls.append((error, code, line_offset, formatted_error, max_error, tail_chars))
+        calls.append((error, code, line_offset, max_error, tail_chars))
         return f"worker diagnostic with tail {tail_chars}"
 
     dto = result_to_dto(
@@ -173,14 +174,13 @@ def test_worker_formatter_receives_complete_context() -> None:
     )
 
     assert dto.error is not None
-    assert dto.error.formatted_error == "worker diagnostic with tail 17"
+    assert dto.error.diagnostic == "worker diagnostic with tail 17"
     assert len(calls) == 1
-    error, code, line_offset, formatted_error, max_error, tail_chars = calls[0]
+    error, code, line_offset, max_error, tail_chars = calls[0]
     assert isinstance(error, ValueError)
     assert str(error) == "failure"
     assert code is None
     assert line_offset == 3
-    assert formatted_error == ""
     assert max_error == 100
     assert tail_chars == 17
 
@@ -198,7 +198,7 @@ def test_formatter_failure_does_not_destroy_worker_error(monkeypatch: pytest.Mon
     assert dto.error == ErrorDTO(
         type_name="ValueError",
         message="original failure",
-        formatted_error="ValueError: original failure",
+        diagnostic="ValueError: original failure",
     )
 
 
@@ -214,7 +214,6 @@ def test_non_string_formatter_result_uses_safe_fallback(invalid_result: object) 
         code: str | None = None,
         *,
         line_offset: int = 0,
-        formatted_error: str = "",
         max_error: int | None = None,
         tail_chars: int | None = None,
     ) -> str:
@@ -226,7 +225,7 @@ def test_non_string_formatter_result_uses_safe_fallback(invalid_result: object) 
     )
 
     assert dto.error is not None
-    assert dto.error.formatted_error == "ValueError: original failure"
+    assert dto.error.diagnostic == "ValueError: original failure"
 
 
 def test_worker_uses_formatter_captured_before_cell_module_mutation() -> None:
@@ -256,8 +255,8 @@ def test_worker_uses_formatter_captured_before_cell_module_mutation() -> None:
     assert dto.error is not None
     assert dto.error.type_name == "RuntimeError"
     assert dto.error.message == "real failure"
-    assert "RuntimeError: real failure" in dto.error.formatted_error
-    assert "forged" not in dto.error.formatted_error
+    assert "RuntimeError: real failure" in dto.error.diagnostic
+    assert "forged" not in dto.error.diagnostic
 
 
 def test_broken_exception_string_still_crosses_worker_boundary() -> None:
@@ -270,7 +269,7 @@ def test_broken_exception_string_still_crosses_worker_boundary() -> None:
     assert dto.error is not None
     assert dto.error.type_name == "BrokenStringError"
     assert dto.error.message == "BrokenStringError"
-    assert dto.error.formatted_error == "BrokenStringError: BrokenStringError"
+    assert dto.error.diagnostic == "BrokenStringError: BrokenStringError"
 
 
 @pytest.mark.parametrize("invalid_limit", [0, -1, True])
@@ -310,27 +309,25 @@ def test_error_dto_text_respects_configured_capture_limit_before_transport_limit
     assert len(dto.error.message) <= max_error + 1_024
 
 
-def test_worker_formatter_output_respects_configured_capture_limit() -> None:
+def test_worker_formatter_output_is_only_subject_to_transport_ceiling() -> None:
     dto = result_to_dto(
         _result_with_error(RuntimeError("failure")),
-        error_formatter=lambda error, code=None, *, line_offset=0, formatted_error="", max_error=None, tail_chars=None: (
+        error_formatter=lambda error, code=None, *, line_offset=0, max_error=None, tail_chars=None: (
             "L" * 1_000
         ),
         max_error=100,
     )
 
     assert dto.error is not None
-    assert "Showing first 50 and last 50 chars" in dto.error.formatted_error
-    assert dto.error.formatted_error.endswith("L" * 50 + "\n</truncated-output>")
+    assert dto.error.diagnostic == "L" * 1_000
 
 
-def test_formatter_failure_fallback_respects_configured_capture_limit() -> None:
+def test_formatter_failure_fallback_is_transport_bounded() -> None:
     def broken_formatter(
         error: Exception,
         code: str | None = None,
         *,
         line_offset: int = 0,
-        formatted_error: str = "",
         max_error: int | None = None,
         tail_chars: int | None = None,
     ) -> str:
@@ -343,8 +340,7 @@ def test_formatter_failure_fallback_respects_configured_capture_limit() -> None:
     )
 
     assert dto.error is not None
-    assert "Showing first 50 and last 50 chars" in dto.error.formatted_error
-    assert dto.error.formatted_error.endswith("F" * 50 + "\n</truncated-output>")
+    assert dto.error.diagnostic == "RuntimeError: " + "F" * 1_000
 
 
 def test_worker_formatted_envelope_is_not_nested() -> None:
@@ -354,27 +350,24 @@ def test_worker_formatted_envelope_is_not_nested() -> None:
     )
 
     assert dto.error is not None
-    assert dto.error.formatted_error.count("<truncated-output>") == 1
-    assert dto.error.formatted_error.count("</truncated-output>") == 1
+    assert dto.error.diagnostic.count("<truncated-output>") == 1
+    assert dto.error.diagnostic.count("</truncated-output>") == 1
 
 
-def test_larger_preformatted_envelope_is_rebounded_for_active_budget() -> None:
+def test_formatter_owned_envelope_is_not_rebounded_by_transport() -> None:
     from nooa.errors.formatting import format_error_for_llm
 
     larger = format_error_for_llm(RuntimeError("X" * 2_000), max_error=400)
     dto = result_to_dto(
         _result_with_error(RuntimeError("surrogate")),
-        error_formatter=lambda error, code=None, *, line_offset=0, formatted_error="", max_error=None, tail_chars=None: (
+        error_formatter=lambda error, code=None, *, line_offset=0, max_error=None, tail_chars=None: (
             larger
         ),
         max_error=100,
     )
 
     assert dto.error is not None
-    assert dto.error.formatted_error.count("<truncated-output>") == 1
-    assert dto.error.formatted_error.count("</truncated-output>") == 1
-    assert "Showing first 50 and last 50 chars" in dto.error.formatted_error
-    assert dto.error.formatted_error.endswith("X" * 50 + "\n</truncated-output>")
+    assert dto.error.diagnostic == larger
 
 
 def test_error_dto_text_never_exceeds_transport_cap() -> None:
@@ -386,7 +379,7 @@ def test_error_dto_text_never_exceeds_transport_cap() -> None:
 
     assert dto.error is not None
     assert len(dto.error.message) <= max_transport
-    assert len(dto.error.formatted_error) <= max_transport
+    assert len(dto.error.diagnostic) <= max_transport
 
 
 def test_error_dto_text_is_bounded_before_ipc() -> None:
@@ -398,7 +391,7 @@ def test_error_dto_text_is_bounded_before_ipc() -> None:
     assert dto.error is not None
     max_transport = max_error + 1_024
     assert len(dto.error.message) <= max_transport
-    assert len(dto.error.formatted_error) <= max_transport
+    assert len(dto.error.diagnostic) <= max_transport
     assert "<truncated-output>" in dto.error.message
     assert dto.error.message.endswith("x" * tail + "\n</truncated-output>")
 
@@ -413,7 +406,7 @@ def test_base_exception_from_exception_string_does_not_escape_serialization(rais
 
     assert dto.error is not None
     assert dto.error.message == "BrokenStringError"
-    assert dto.error.formatted_error == "BrokenStringError: BrokenStringError"
+    assert dto.error.diagnostic == "BrokenStringError: BrokenStringError"
 
 
 def test_ordinary_return_is_pickled_only_once_before_transport() -> None:

@@ -53,6 +53,7 @@ from nooa.events import (
 )
 from nooa.runtime.harness_metrics import get_harness_metrics
 from nooa.runtime.hooks import call_after_hook, call_before_hook
+from nooa.runtime.sandbox.errors import SandboxExecutionError
 from nooa.strategies.base import RuntimeServices, build_sampling_kwargs
 from nooa.strategies.codeact_errors import format_validation_error
 from nooa.strategies.composite import CompositeStrategy
@@ -331,9 +332,8 @@ class CodeActStrategy(CompositeStrategy):
             config: CodeActConfig with iteration limits, timeouts, and sampling params.
                     Defaults to CodeActConfig() with standard defaults.
             error_formatter: Custom error formatter for LLM feedback. It must implement
-                ``format(error, code=None, *, line_offset=0, formatted_error="",
-                max_error=None, tail_chars=None)``. ``formatted_error`` contains a
-                traceback rendered inside a sandbox worker, when available.
+                ``format(error, code=None, *, line_offset=0, max_error=None,
+                tail_chars=None)``.
 
         Note:
             Prefill is always enabled and uses InspectInputsPrefill internally.
@@ -1529,9 +1529,12 @@ Standard Python builtins and agent instance (`self`) are available."""
         hm = get_harness_metrics()
         hm.exec_python(success=not result.error)
         if result.error:
-            hm.exec_error(
-                type(result.error).__name__, str(result.error)[:500], session.iteration, code[:200]
+            error_type = (
+                result.error.original_type
+                if isinstance(result.error, SandboxExecutionError)
+                else type(result.error).__name__
             )
+            hm.exec_error(error_type, str(result.error)[:500], session.iteration, code[:200])
 
         # Update ToolCallEvent with final status
         runtime.event_manager.update(
@@ -2791,7 +2794,6 @@ Standard Python builtins and agent instance (`self`) are available."""
             result.error,
             code,
             line_offset=result.wrapper_line_offset,
-            formatted_error=result.formatted_error,
             max_error=runtime.truncation_config.capture.max_error,
             tail_chars=runtime.truncation_config.capture.tail,
         )
@@ -2802,7 +2804,6 @@ Standard Python builtins and agent instance (`self`) are available."""
         code: str | None = None,
         *,
         line_offset: int = 0,
-        formatted_error: str = "",
         max_error: int | None = None,
         tail_chars: int | None = None,
     ) -> str:
@@ -2812,7 +2813,6 @@ Standard Python builtins and agent instance (`self`) are available."""
                 error,
                 code,
                 line_offset=line_offset,
-                formatted_error=formatted_error,
                 max_error=max_error,
                 tail_chars=tail_chars,
             )
@@ -2823,7 +2823,6 @@ Standard Python builtins and agent instance (`self`) are available."""
             error,
             code,
             line_offset=line_offset,
-            formatted_error=formatted_error,
             max_error=max_error,
             tail_chars=tail_chars,
         )

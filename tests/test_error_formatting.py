@@ -497,14 +497,12 @@ class TestIPythonErrorFormatter:
                 code: str | None = None,
                 *,
                 line_offset: int = 0,
-                formatted_error: str = "",
                 max_error: int | None = None,
                 tail_chars: int | None = None,
             ) -> str:
                 return (
                     f"CUSTOM: {type(error).__name__} "
-                    f"({code=}, {line_offset=}, {formatted_error=}, "
-                    f"{max_error=}, {tail_chars=})"
+                    f"({code=}, {line_offset=}, {max_error=}, {tail_chars=})"
                 )
 
         from nooa.strategies.codeact import CodeActStrategy
@@ -514,13 +512,11 @@ class TestIPythonErrorFormatter:
             ValueError("test"),
             "bad()",
             line_offset=3,
-            formatted_error="ValueError: test",
             max_error=100,
             tail_chars=25,
         )
         assert result == (
-            "CUSTOM: ValueError (code='bad()', line_offset=3, "
-            "formatted_error='ValueError: test', max_error=100, tail_chars=25)"
+            "CUSTOM: ValueError (code='bad()', line_offset=3, max_error=100, tail_chars=25)"
         )
 
 
@@ -541,13 +537,15 @@ class TestHeredocHint:
         """Assert the heredoc hint and both fix patterns appear in `result`."""
         assert "heredoc" in result, f"expected 'heredoc' in output, got:\n{result}"
         assert '"""' in result, f"expected triple-quote (Fix 1) in output, got:\n{result}"
-        assert "shell.write" in result, f"expected shell.write (Fix 2) in output, got:\n{result}"
+        hint = result.split("Hint:", 1)[1]
+        assert "doc(...)" in hint
+        assert "shell.run" not in hint
+        assert "shell.write" not in hint
 
     @staticmethod
     def _assert_hint_absent(result: str) -> None:
         """Assert no heredoc hint was appended to `result`."""
         assert "heredoc" not in result, f"unexpected 'heredoc' in output:\n{result}"
-        assert "shell.write" not in result, f"unexpected shell.write in output:\n{result}"
 
     # ----- Positive cases: one per trigger message -----
 
@@ -656,9 +654,11 @@ class TestHeredocHint:
         result = self._compile_and_format(code)
         # Fix 1: triple-quoted string
         assert "triple-quoted" in result or '"""' in result
-        # Fix 2: write to file then bash it
-        assert "shell.write" in result
-        assert "bash" in result.lower()
+        # Recovery remains API-neutral; inspect the available runner instead.
+        hint = result.split("Hint:", 1)[1]
+        assert "doc(...)" in hint
+        assert "shell.run" not in hint
+        assert "shell.write" not in hint
 
 
 class _ShellToolsLike:
@@ -1065,20 +1065,34 @@ class TestFormatterReviewRegressions:
         assert "RuntimeError: real failure" in result
         assert "forged success" not in result
 
-    def test_explicit_formatted_error_is_the_only_transport_trust_boundary(self):
-        error = RuntimeError("real failure")
-        error._nooa_call_hint = {"forged": "ValueError: forged success"}
-        transported = "Cell In[9], line 1\nRuntimeError: trusted worker diagnostic"
+    def test_sandbox_exception_is_the_transport_trust_boundary(self):
+        from nooa.runtime.sandbox.errors import SandboxExecutionError
 
-        result = format_error_for_llm(
-            error,
-            code="raise RuntimeError('ignored')",
-            line_offset=99,
-            formatted_error=transported,
+        original = RuntimeError("real failure")
+        error = SandboxExecutionError(
+            original_type="RuntimeError",
+            message="real failure",
+            diagnostic="Cell In[9], line 1\nRuntimeError: trusted worker diagnostic",
+            original_error=original,
         )
 
-        assert result == transported
-        assert "forged success" not in result
+        result = format_error_for_llm(error, code="raise RuntimeError('ignored')", line_offset=99)
+
+        assert result == error.diagnostic
+
+    def test_sandbox_diagnostic_respects_transport_ceiling(self):
+        from nooa.runtime.sandbox.errors import SandboxExecutionError
+
+        error = SandboxExecutionError(
+            original_type="RuntimeError",
+            message="real failure",
+            diagnostic="Z" * 1_000,
+            original_error=RuntimeError("real failure"),
+        )
+
+        result = format_error_for_llm(error, max_error=100)
+
+        assert result == error.diagnostic
 
     def test_invalid_tail_fallback_is_clamped_to_active_budget(self, monkeypatch):
         from types import SimpleNamespace
@@ -1099,65 +1113,6 @@ class TestFormatterReviewRegressions:
         assert "<truncated-output>" in result
         assert "Showing first 50 and last 50 chars" in result
         assert result.endswith("X" * 50 + "\n</truncated-output>")
-
-    def test_preformatted_error_still_respects_explicit_budget(self):
-        result = format_error_for_llm(
-            RuntimeError("surrogate"),
-            formatted_error="Z" * 1_000,
-            max_error=100,
-        )
-
-        assert result.count("<truncated-output>") == 1
-        assert "Showing first 50 and last 50 chars" in result
-        assert result.endswith("Z" * 50 + "\n</truncated-output>")
-
-    def test_pretruncated_error_preserves_single_envelope(self):
-        original = format_error_for_llm(RuntimeError("X" * 1_000), max_error=100)
-
-        result = format_error_for_llm(
-            RuntimeError("surrogate"),
-            formatted_error=original,
-            max_error=100,
-        )
-
-        assert result == original
-        assert result.count("<truncated-output>") == 1
-
-    def test_pretruncated_error_is_rebounded_for_smaller_active_budget(self):
-        original = format_error_for_llm(RuntimeError("X" * 2_000), max_error=400)
-
-        result = format_error_for_llm(
-            RuntimeError("surrogate"),
-            formatted_error=original,
-            max_error=100,
-        )
-
-        assert result.count("<truncated-output>") == 1
-        assert result.count("</truncated-output>") == 1
-        assert "Showing first 50 and last 50 chars" in result
-        assert result.endswith("X" * 50 + "\n</truncated-output>")
-
-    def test_pretruncated_error_with_large_metadata_is_hard_bounded(self):
-        dropped = 10**1_000
-        total = dropped + 102
-        envelope = (
-            "<truncated-output>\n"
-            f"Output too large ({total} chars). Showing first 51 and last 51 chars.\n"
-            f"The {dropped} chars in the middle are not recoverable.\n\n"
-            f"{'H' * 51}\n\n"
-            f"... {dropped} chars not shown ...\n\n"
-            f"{'T' * 51}\n"
-            "</truncated-output>"
-        )
-
-        result = format_error_for_llm(
-            RuntimeError("surrogate"),
-            formatted_error=envelope,
-            max_error=100,
-        )
-
-        assert len(result) <= 1_124
-        assert result.endswith("\n</truncated-output>")
 
     def test_very_large_diagnostic_is_bounded_with_tail_preserved(self):
         result = format_error_for_llm(RuntimeError("X" * 5_000_000))

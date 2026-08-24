@@ -907,46 +907,38 @@ class TestFormatErrorCustomFormatter:
                 code=None,
                 *,
                 line_offset=0,
-                formatted_error="",
                 max_error=None,
                 tail_chars=None,
             ):
-                return (
-                    f"custom[{line_offset}/{max_error}/{tail_chars}]: "
-                    f"{error}: {code}: {formatted_error}"
-                )
+                return f"custom[{line_offset}/{max_error}/{tail_chars}]: {error}: {code}"
 
         strat = CodeActStrategy(error_formatter=CustomFormatter())
         result = strat._format_error(
             ValueError("surrogate"),
             "bad()",
             line_offset=4,
-            formatted_error="Cell In[7], line 1\nValueError: original",
             max_error=321,
             tail_chars=17,
         )
 
-        assert result == (
-            "custom[4/321/17]: surrogate: bad(): Cell In[7], line 1\nValueError: original"
-        )
+        assert result == "custom[4/321/17]: surrogate: bad()"
 
     def test_builtin_formatter_receives_worker_diagnostic_and_error_budget(self):
         from nooa.errors import IPythonErrorFormatter
+        from nooa.runtime.sandbox.errors import SandboxExecutionError
 
         strat = CodeActStrategy(error_formatter=IPythonErrorFormatter())
-        transported = "Cell In[7], line 1\nValueError: " + "x" * 500
-
-        result = strat._format_error(
-            ValueError("surrogate"),
-            "bad()",
-            line_offset=4,
-            formatted_error=transported,
-            max_error=100,
+        diagnostic = "Cell In[7], line 1\nValueError: " + "x" * 500
+        error = SandboxExecutionError(
+            original_type="ValueError",
+            message="surrogate",
+            diagnostic=diagnostic,
+            original_error=ValueError("surrogate"),
         )
 
-        assert result.count("<truncated-output>") == 1
-        assert "Showing first 50 and last 50 chars" in result
-        assert result.endswith("x" * 50 + "\n</truncated-output>")
+        result = strat._format_error(error, "bad()", line_offset=4, max_error=100)
+
+        assert result == diagnostic
         assert "surrogate" not in result
 
     def test_incomplete_custom_formatter_is_rejected(self):
@@ -969,7 +961,6 @@ class TestFormatErrorCustomFormatter:
                 code=None,
                 *,
                 line_offset=0,
-                formatted_error="",
                 max_error=None,
                 tail_chars=None,
             ):
@@ -1512,7 +1503,6 @@ class TestPurePythonRunPrefill:
             stdout="before failure\n",
             stderr="warning\n",
             error=RuntimeError("execution failed"),
-            formatted_error="Cell In[0], line 2\nRuntimeError: execution failed",
             defined_methods={},
             wrapper_line_offset=3,
         )
@@ -1524,7 +1514,7 @@ class TestPurePythonRunPrefill:
         assert output.execution_status is ResultStatus.ERROR
         assert output.stdout == "before failure\n"
         assert output.stderr == "warning\n"
-        assert output.error == error_result.formatted_error
+        assert output.error == "RuntimeError: execution failed"
         assert output.metadata == {
             "prefill": True,
             "prefill_type": "inspect_inputs",
@@ -2808,7 +2798,6 @@ class TestCodeActExecutePrefillStep:
             return ExecutionResult(
                 stdout=f"cell {count}",
                 error=RuntimeError("failure") if count == 2 else None,
-                formatted_error=f"Cell In[{count}]\nRuntimeError: failure" if count == 2 else "",
                 defined_methods={},
             )
 
@@ -2824,7 +2813,7 @@ class TestCodeActExecutePrefillStep:
         ]
         assert executed_counts == [1, 2]
         assert [output.execution_count for output in outputs] == [1, 2]
-        assert outputs[1].error == "Cell In[2]\nRuntimeError: failure"
+        assert outputs[1].error == "RuntimeError: failure"
         assert session.record_execution() == 3
 
     @pytest.mark.asyncio

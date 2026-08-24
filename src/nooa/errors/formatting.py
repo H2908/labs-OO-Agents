@@ -49,15 +49,7 @@ _CELL_PATTERN = re.compile(r"^Cell In\[\d+\]$")
 
 # Internal wrapper function names to replace with <module>
 _WRAPPER_NAMES = ("__repl_wrapper__", "__wrapper__")
-_TRUNCATED_DIAGNOSTIC_PATTERN = re.compile(
-    r"\A<truncated-output>\n"
-    r"Output too large \(([\d,]+) chars\)\. "
-    r"Showing first ([\d,]+) and last ([\d,]+) chars\.\n"
-    r"The ([\d,]+) chars in the middle are not recoverable\.\n\n"
-    r"(.*?)\n\n\.\.\. ([\d,]+) chars not shown \.\.\.\n\n"
-    r"(.*)\n</truncated-output>\Z",
-    re.DOTALL,
-)
+
 
 # ---------------------------------------------------------------------------
 # Targeted model-recovery hints
@@ -78,19 +70,17 @@ _HEREDOC_TRIGGER_MSGS = (
 _HEREDOC_RE = re.compile(r"<<-?\s*['\"]?\w+['\"]?")
 
 # Appended to SyntaxErrors that look like heredoc-in-quoted-string failures.
-_HEREDOC_HINT = """\
-Hint: this looks like a bash heredoc (`<<...`) embedded in a single- or
-double-quoted Python string. Python rejects multi-line single/double-quoted
-strings, which is why the parser errored before reaching the heredoc body.
+_HEREDOC_HINT = '''\
+Hint: this looks like a shell heredoc (`<<...`) embedded in a single- or
+multiple-line Python string. Put the complete command in a triple-quoted
+string, then pass that value using the callable's documented API:
 
-Fix 1 (preferred) — use a triple-quoted Python string so newlines are legal:
-    await shell.run(\"\"\"cat <<EOF
-    content
-    EOF\"\"\")
+    command = """cat <<'EOF'
+content
+EOF"""
 
-Fix 2 — write the script to a file first, then run it:
-    await shell.write("/tmp/script.sh", script_text)
-    await shell.run("bash /tmp/script.sh")"""
+Use `doc(...)` to inspect the available command runner and how it accepts
+commands or standard input.'''
 
 
 # Call-shape TypeError messages — a method/function called with the wrong
@@ -498,77 +488,11 @@ def _hard_bound_text(text: str, limit: int, *, closing: str = "") -> str:
     return marker[:limit]
 
 
-def _bound_preformatted_diagnostic(
-    text: str,
-    max_error: int | None,
-    tail_chars: int | None,
-) -> str:
-    """Bound trusted backend text without nesting a valid truncation envelope."""
-    text = text.rstrip()
-    limit, tail = _diagnostic_budget(max_error, tail_chars)
-    if len(text) <= limit:
-        return text
-
-    match = _TRUNCATED_DIAGNOSTIC_PATTERN.fullmatch(text)
-    if match is None:
-        return _bound_diagnostic(text, max_error, tail_chars)
-
-    total_text, old_head_text, old_tail_text, dropped_text, head, repeated_text, tail_text = (
-        match.groups()
-    )
-    try:
-        total = int(total_text.replace(",", ""))
-        old_head_chars = int(old_head_text.replace(",", ""))
-        old_tail_chars = int(old_tail_text.replace(",", ""))
-        dropped = int(dropped_text.replace(",", ""))
-        repeated_dropped = int(repeated_text.replace(",", ""))
-    except ValueError:
-        return _bound_diagnostic(text, max_error, tail_chars)
-    if (
-        old_head_chars != len(head)
-        or old_tail_chars != len(tail_text)
-        or dropped != repeated_dropped
-        or total != old_head_chars + old_tail_chars + dropped
-    ):
-        return _bound_diagnostic(text, max_error, tail_chars)
-
-    desired_tail = limit // 2 if tail is None else tail
-    desired_head = limit - desired_tail
-    if old_head_chars <= desired_head and old_tail_chars <= desired_tail:
-        return _hard_bound_text(
-            text,
-            limit + 1_024,
-            closing="\n</truncated-output>",
-        )
-
-    # The original middle is already gone, so retain as much of each requested
-    # window as remains available and accurately describe the larger omission.
-    bounded_head = head[:desired_head]
-    bounded_tail = tail_text[-desired_tail:] if desired_tail else ""
-    new_dropped = total - len(bounded_head) - len(bounded_tail)
-    rebuilt = (
-        "<truncated-output>\n"
-        f"Output too large ({total:,} chars). "
-        f"Showing first {len(bounded_head):,} and last {len(bounded_tail):,} chars.\n"
-        f"The {new_dropped:,} chars in the middle are not recoverable.\n\n"
-        f"{bounded_head}\n\n"
-        f"... {new_dropped:,} chars not shown ...\n\n"
-        f"{bounded_tail}\n"
-        "</truncated-output>"
-    )
-    return _hard_bound_text(
-        rebuilt,
-        limit + 1_024,
-        closing="\n</truncated-output>",
-    )
-
-
 class ErrorFormatter(Protocol):
     """Preferred strategy formatter contract.
 
-    Implementations receive trusted backend-rendered diagnostics and the resolved
-    per-call error budget. Custom strategy formatters must implement this complete
-    contract.
+    Implementations receive the exception, source context, and resolved per-call
+    error budget. Custom strategy formatters must implement this complete contract.
     """
 
     def format(
@@ -577,7 +501,6 @@ class ErrorFormatter(Protocol):
         code: str | None = None,
         *,
         line_offset: int = 0,
-        formatted_error: str = "",
         max_error: int | None = None,
         tail_chars: int | None = None,
     ) -> str: ...
@@ -601,7 +524,6 @@ class IPythonErrorFormatter:
         code: str | None = None,
         *,
         line_offset: int = 0,
-        formatted_error: str = "",
         max_error: int | None = None,
         tail_chars: int | None = None,
     ) -> str:
@@ -611,9 +533,6 @@ class IPythonErrorFormatter:
             error: The exception to format.
             code: Optional source code (used for syntax errors if text is missing).
             line_offset: Number of wrapper lines to subtract from line numbers.
-            formatted_error: Trusted diagnostic already rendered by an execution
-                backend. It bypasses local rendering so worker-local traceback
-                and source context are preserved.
             max_error: Maximum retained diagnostic characters. ``None`` uses the
                 framework default.
             tail_chars: Characters reserved for the retained tail. ``None`` uses
@@ -622,10 +541,15 @@ class IPythonErrorFormatter:
         Returns:
             Formatted error string with adjusted line numbers.
         """
-        if formatted_error:
-            # Worker-generated truncation envelopes have already applied the
-            # resolved policy; preserve one envelope while retaining a hard cap.
-            return _bound_preformatted_diagnostic(formatted_error, max_error, tail_chars)
+        from nooa.runtime.sandbox.errors import SandboxExecutionError
+
+        if isinstance(error, SandboxExecutionError):
+            limit, _ = _diagnostic_budget(max_error, tail_chars)
+            return _hard_bound_text(
+                error.diagnostic.rstrip() or str(error),
+                limit + 1_024,
+                closing="\n</truncated-output>",
+            )
 
         if isinstance(error, SyntaxError):
             formatted = self._format_syntax_error(error, code, line_offset)
@@ -699,7 +623,6 @@ def format_error_for_llm(
     code: str | None = None,
     *,
     line_offset: int = 0,
-    formatted_error: str = "",
     max_error: int | None = None,
     tail_chars: int | None = None,
 ) -> str:
@@ -719,11 +642,6 @@ def format_error_for_llm(
         line_offset: Number of wrapper lines to subtract from line numbers.
             This compensates for lines added by the async wrapper (e.g.,
             "async def __repl_wrapper__():", "try:", etc.).
-        formatted_error: Optional preformatted diagnostic produced by a trusted
-            execution backend such as the sandbox worker. When non-empty, it
-            bypasses local formatting (including ``code``, ``line_offset``, and
-            bad-call hint handling). The producer is responsible for applying any
-            required line adjustment.
         max_error: Maximum retained diagnostic characters. ``None`` uses the
             framework default.
         tail_chars: Characters reserved for the retained tail. ``None`` uses
@@ -737,7 +655,6 @@ def format_error_for_llm(
             error,
             code,
             line_offset=line_offset,
-            formatted_error=formatted_error,
             max_error=max_error,
             tail_chars=tail_chars,
         )
