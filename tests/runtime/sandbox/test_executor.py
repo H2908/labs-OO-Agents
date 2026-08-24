@@ -141,7 +141,10 @@ async def test_persistent_namespace_keeps_assignments_from_failed_cell():
     try:
         failed = await _run(ex, "answer = 41\nraise ValueError('boom')", 1)
         assert not failed.success
-        assert isinstance(failed.error, ValueError)
+        from nooa.runtime.sandbox.errors import SandboxExecutionError
+
+        assert isinstance(failed.error, SandboxExecutionError)
+        assert isinstance(failed.error.original_error, ValueError)
 
         resumed = await _run(ex, "answer + 1", 2)
         assert resumed.success, resumed.error
@@ -403,8 +406,11 @@ async def test_cell_error_is_reported_not_raised():
         res = await _run(ex, "raise ValueError('boom')")
         assert not res.success
         assert "boom" in str(res.error)
-        # The real exception type is reconstructed (not a generic surrogate).
-        assert isinstance(res.error, ValueError)
+        # The typed boundary retains the reconstructed worker exception.
+        from nooa.runtime.sandbox.errors import SandboxExecutionError
+
+        assert isinstance(res.error, SandboxExecutionError)
+        assert isinstance(res.error.original_error, ValueError)
     finally:
         await ex.aclose()
 
