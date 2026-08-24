@@ -39,6 +39,7 @@ class ErrorDTO:
     type_name: str
     message: str
     traceback: str
+    frames: list[tuple[str, int, str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -109,6 +110,10 @@ def result_to_dto(result: Any) -> ResultDTO:
             type_name=type(err).__name__,
             message=message,
             traceback="".join(tb.format_exception(type(err), err, err.__traceback__)),
+            frames=[
+                (f.filename, f.lineno or 0, f.name, f.line or "")
+                for f in tb.extract_tb(err.__traceback__)
+            ],
         )
         return dto
 
@@ -182,8 +187,15 @@ def _reconstruct_error(err: ErrorDTO) -> Exception:
                 exc = _SurrogateCellError(err)
         else:
             exc = _SurrogateCellError(err)
+
     if err.traceback:
         exc.worker_traceback = err.traceback  # type: ignore[attr-defined]
+    if err.frames:
+        import traceback as _tb
+
+        exc.worker_frames = [  # type: ignore[attr-defined]
+            _tb.FrameSummary(fn, ln, nm, line=src) for fn, ln, nm, src in err.frames
+        ]
     return exc
 
 

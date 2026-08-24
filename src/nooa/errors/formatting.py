@@ -362,11 +362,16 @@ class IPythonErrorFormatter:
                     ~~^~~
             ZeroDivisionError: division by zero
         """
-        if not error.__traceback__:
-            return f"{type(error).__name__}: {error}"
+        # Frames come either from a live traceback (in-process) or, when the cell
+        # ran in the sandbox worker, from frames marshaled across the process
+        # boundary — a reconstructed exception has no live ``__traceback__``.
+        if error.__traceback__:
+            extracted = traceback.extract_tb(error.__traceback__)
+        else:
+            extracted = list(getattr(error, "worker_frames", ()))
 
-        # Extract all frames as FrameSummary objects (filterable)
-        extracted = traceback.extract_tb(error.__traceback__)
+        if not extracted:
+            return f"{type(error).__name__}: {error}"
 
         # Filter to user code frames only
         user_frames = [frame for frame in extracted if _is_user_code_frame(frame.filename)]
