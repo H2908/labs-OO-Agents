@@ -705,6 +705,7 @@ def _format_type_info(
             discover_referenced_types,
         )
         from nooa.agentdoc._structured import extract_type_info
+        from nooa.agentdoc._visibility import is_hidden_field as _is_hidden_field
 
         visible_field_names = {field.name for field in info.fields}
         seed_set: set[type] = {
