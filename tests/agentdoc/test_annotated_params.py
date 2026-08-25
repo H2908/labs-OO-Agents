@@ -228,7 +228,10 @@ class TestCallableInstanceAnnotatedParams:
         assert "current values and public runtime fields" in result
         assert "properties stay unevaluated" in result
         assert "custom ``__repr__`` methods never" in result
-        assert len(result.splitlines()) <= 24
+        assert "inline_depth: int = 1" in result
+        assert "``2+`` includes" in result
+        assert "inline_depth: int | None" not in result
+        assert len(result.splitlines()) <= 25
 
 
 # ---------------------------------------------------------------------------

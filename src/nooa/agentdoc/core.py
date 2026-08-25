@@ -46,9 +46,9 @@ def doc(
     *objs: Any,
     concise: Annotated[bool, "Show first-line docstrings only"] = False,
     inline_depth: Annotated[
-        int | None,
-        "Levels of referenced types to expand inline; 0 = none, 1 = direct (default), 2+ = transitive; None = auto",
-    ] = None,
+        int,
+        "Levels of referenced types to expand inline; 0 = none, 1 = direct (default), 2+ = transitive",
+    ] = 1,
 ) -> str:
     """Render prompt-ready API documentation for one or more Python objects.
 
@@ -64,7 +64,8 @@ def doc(
             ``doc([A, B])``.
         concise: Show only the first line of each docstring.
         inline_depth: Referenced-type depth. ``0`` disables expansion, ``1``
-            includes direct references, and ``None`` chooses the default.
+            includes direct references (the default), and ``2+`` includes
+            transitive references to that depth.
 
     Returns:
         The formatted API documentation.
@@ -81,9 +82,10 @@ def doc(
     if not flat_objs:
         raise ValueError("doc() requires at least one object")
 
-    # Resolve inline_depth default based on concise
-    if inline_depth is None:
-        inline_depth = 0 if concise else 1
+    if not isinstance(inline_depth, int) or isinstance(inline_depth, bool):
+        raise TypeError("inline_depth must be a non-negative integer")
+    if inline_depth < 0:
+        raise ValueError("inline_depth must be a non-negative integer")
 
     # Single object: use optimized path
     if len(flat_objs) == 1:
@@ -367,7 +369,7 @@ def variables(
             # For classes, use doc(concise=True) to get a nice summary
             if inspect.isclass(attr):
                 class_name = attr.__name__
-                value_str = doc(attr, concise=True)
+                value_str = doc(attr, concise=True, inline_depth=0)
                 line = f"{name}: type[{class_name}] = {value_str}"
 
                 # Append hint within the existing comment if present

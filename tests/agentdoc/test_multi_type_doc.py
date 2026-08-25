@@ -213,10 +213,18 @@ class TestTypeDepthParameter:
         assert "class Address" in result
 
     def test_inline_depth_default_with_concise_true(self):
-        """Default inline_depth=0 when concise=True."""
+        """Default inline_depth=1 is independent of concise docstrings."""
         result = doc(Customer, concise=True)
 
-        assert "## Referenced Types" not in result
+        assert "## Referenced Types" in result
+        assert "class Address" in result
+
+    @pytest.mark.parametrize("invalid_depth", [None, -1, 1.5, "1", True])
+    def test_inline_depth_rejects_non_nonnegative_integers(self, invalid_depth):
+        """inline_depth accepts only non-negative integers."""
+        error = ValueError if invalid_depth == -1 else TypeError
+        with pytest.raises(error, match="inline_depth must be a non-negative integer"):
+            doc(Customer, inline_depth=invalid_depth)
 
     def test_inline_depth_override_with_concise_true(self):
         """Explicit inline_depth overrides concise=True default."""
