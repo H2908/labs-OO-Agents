@@ -16,9 +16,14 @@ Quick start:
         label: Annotated[str, spec(description="Display name")] = "agent"
 
     agent = MyAgent()
-    doc(MyAgent)   # → API contract (type view)
-    doc(agent)     # → API contract with current values substituted
-    pformat(agent) # → compact repr: MyAgent(label='agent')
+    agent.region = "us-east"
+    doc(MyAgent)   # → API contract with declared defaults
+    doc(agent)     # → same contract + current values and public runtime fields
+    pformat(agent) # → compact value representation: MyAgent(label='agent', region='us-east')
+
+Unlike pformat(), doc(instance) documents the type structure even when the
+instance defines a custom __repr__. It preserves declared fields, methods,
+properties, docstrings, and referenced types; properties are not evaluated.
 """
 
 import io

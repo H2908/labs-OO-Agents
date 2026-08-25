@@ -60,12 +60,18 @@ def doc(
 
         doc(MyAgent)          # label: str = "agent"
 
-    Passing an **instance** preserves the type-level documentation, replaces
-    defaults with available current values, and adds public runtime-only fields::
+    Passing an **instance** preserves declared fields, methods, properties,
+    docstrings, and referenced types. Available current values replace defaults,
+    and public runtime-only fields are added::
 
         agent = MyAgent(label="prod")
         agent.region = "us-east"
         doc(agent)            # label: str = "prod"; region: str = "us-east"
+
+    Instance visibility overrides from ``spec(instance, field, hidden=...)`` are
+    applied. Properties are documented without being evaluated. Unlike
+    ``pformat()``, instance documentation ignores a custom ``__repr__`` so that
+    the API contract remains visible.
 
     Respects ``@spec(expand=False)`` on field types — those are collapsed to a
     one-liner instead of being expanded inline.
