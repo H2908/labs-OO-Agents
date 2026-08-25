@@ -50,40 +50,24 @@ def doc(
         "Levels of referenced types to expand inline; 0 = none, 1 = direct (default), 2+ = transitive; None = auto",
     ] = None,
 ) -> str:
-    """Get the documentation for one or more objects — step 2: render the API contract.
+    """Render prompt-ready API documentation for one or more Python objects.
 
-    Renders the API contract of a class, function, module, or instance as a
-    prompt-ready string. Referenced types are expanded inline and deduplicated
-    across all objects passed.
+    Types show their declared API and defaults. Instances show that same contract
+    enriched with current values and public runtime fields. Visibility rules are
+    honored, properties stay unevaluated, and custom ``__repr__`` methods never
+    hide the API.
 
-    Passing a **type** shows default field values::
-
-        doc(MyAgent)          # label: str = "agent"
-
-    Passing an **instance** preserves declared fields, methods, properties,
-    docstrings, and referenced types. Available current values replace defaults,
-    and public runtime-only fields are added::
-
-        agent = MyAgent(label="prod")
-        agent.region = "us-east"
-        doc(agent)            # label: str = "prod"; region: str = "us-east"
-
-    Instance visibility overrides from ``spec(instance, field, hidden=...)`` are
-    applied. Properties are documented without being evaluated. Unlike
-    ``pformat()``, instance documentation ignores a custom ``__repr__`` so that
-    the API contract remains visible.
-
-    Respects ``@spec(expand=False)`` on field types — those are collapsed to a
-    one-liner instead of being expanded inline.
+    Referenced types are expanded inline and deduplicated across the result.
 
     Args:
-        *objs: One or more objects: doc(MyClass), doc(Class, fn), doc([A, B])
-        concise: Show first-line docstrings only.
-        inline_depth: Levels of referenced types to expand inline (default 1).
-            0 = none, 1 = direct references, 2+ = transitive. None = auto.
+        *objs: Objects to document: ``doc(MyClass)``, ``doc(Class, fn)``, or
+            ``doc([A, B])``.
+        concise: Show only the first line of each docstring.
+        inline_depth: Referenced-type depth. ``0`` disables expansion, ``1``
+            includes direct references, and ``None`` chooses the default.
 
     Returns:
-        Formatted documentation string with each type appearing exactly once.
+        The formatted API documentation.
     """
     # Flatten input: handle lists/tuples passed as single argument
     # Only flatten if the list/tuple contains documentable objects (types, callables, modules)

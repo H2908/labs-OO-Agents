@@ -210,23 +210,25 @@ class TestCallableInstanceAnnotatedParams:
         else:
             raise AssertionError("spec() function not found in doc(agentdoc)")
 
-    def test_agentdoc_module_documents_instance_contract(self):
-        """doc(agentdoc) explains the type-contract and value-view distinction."""
+    def test_agentdoc_module_presents_type_and_value_views(self):
+        """doc(agentdoc) gives a concise, runnable mental model."""
         from nooa import agentdoc
 
         result = doc(agentdoc)
-        assert "same contract + current values and public runtime fields" in result
-        assert "documents the type structure even when" in result
-        assert "properties are not evaluated" in result
+        assert "Show an agent what an object can do" in result
+        assert "doc(Assistant)" in result
+        assert "doc(assistant)" in result
+        assert "pformat(assistant)" in result
+        assert len(result.splitlines()) <= 140
 
-    def test_doc_documents_complete_instance_behavior(self):
-        """doc(doc) exposes the complete public contract for instance rendering."""
+    def test_doc_explains_instance_contract(self):
+        """doc(doc) captures the essential instance-rendering guarantees."""
         result = doc(doc)
-        assert "preserves declared fields, methods, properties" in result
-        assert "public runtime-only fields are added" in result
-        assert "spec(instance, field, hidden=...)" in result
-        assert "Properties are documented without being evaluated" in result
-        assert "ignores a custom ``__repr__``" in result
+        assert "same contract" in result
+        assert "current values and public runtime fields" in result
+        assert "properties stay unevaluated" in result
+        assert "custom ``__repr__`` methods never" in result
+        assert len(result.splitlines()) <= 24
 
 
 # ---------------------------------------------------------------------------
