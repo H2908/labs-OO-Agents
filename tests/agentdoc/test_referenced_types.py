@@ -168,6 +168,31 @@ def test_doc_includes_referenced_types():
     assert main_class_pos < ref_section_pos
 
 
+def test_instance_hidden_field_type_not_in_referenced_types():
+    """Instance-hidden field types must not leak through referenced docs."""
+    from nooa.agentdoc import spec
+
+    class Secret:
+        def reveal(self) -> str:
+            """Sensitive API."""
+            return "secret"
+
+    class Holder:
+        secret: Secret
+
+        def __init__(self):
+            self.secret = Secret()
+
+    holder = Holder()
+    spec(holder, "secret", hidden=True)
+    output = doc(holder)
+
+    assert "secret" not in output.lower()
+    assert "class Secret" not in output
+    assert "reveal" not in output
+    assert "## Referenced Types" not in output
+
+
 def test_doc_no_referenced_types_if_none():
     """Test that Referenced Types section is omitted if no custom types."""
     output = doc(SimpleClass)

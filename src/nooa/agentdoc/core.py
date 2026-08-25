@@ -60,10 +60,12 @@ def doc(
 
         doc(MyAgent)          # label: str = "agent"
 
-    Passing an **instance** shows the current field values in place of defaults::
+    Passing an **instance** preserves the type-level documentation, replaces
+    defaults with available current values, and adds public runtime-only fields::
 
         agent = MyAgent(label="prod")
-        doc(agent)            # label: str = "prod"
+        agent.region = "us-east"
+        doc(agent)            # label: str = "prod"; region: str = "us-east"
 
     Respects ``@spec(expand=False)`` on field types — those are collapsed to a
     one-liner instead of being expanded inline.
@@ -130,10 +132,15 @@ def _doc_multiple(
     sections: list[str] = []
     seen_types: set[type] = set()
 
-    # Track which objects are types for deduplication
+    # Track primary contract types for deduplication. Instances document their
+    # type API, so their types must not reappear under Referenced Types.
     for obj in objs:
         if isinstance(obj, type):
             seen_types.add(obj)
+        elif not (inspect.isfunction(obj) or inspect.ismethod(obj) or inspect.ismodule(obj)):
+            obj_type = type(obj)
+            if obj_type.__module__ != "builtins":
+                seen_types.add(obj_type)
 
     # 1. Format each primary object (without their own referenced types section)
     for obj in objs:

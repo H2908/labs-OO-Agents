@@ -95,6 +95,28 @@ class TestMultiTypeDoc:
         assert "value_a: str" in result
         assert "value_b: int" in result
 
+    def test_doc_multiple_instances_preserves_referenced_types(self):
+        """Multi-instance docs discover the same contract types as type docs."""
+
+        class Inner(BaseModel):
+            value: str
+
+        class Outer(BaseModel):
+            inner: Inner
+
+        class RuntimeDetail:
+            detail: str = "runtime"
+
+        outer = Outer(inner=Inner(value="x"))
+        outer.__pydantic_extra__ = {"detail": RuntimeDetail()}
+        result = doc(outer, SimpleA(value_a="a"), inline_depth=1)
+
+        assert "class Outer(BaseModel):" in result
+        assert "class SimpleA(BaseModel):" in result
+        assert "## Referenced Types" in result
+        assert result.count("class Inner(BaseModel):") == 1
+        assert result.count("class RuntimeDetail:") == 1
+
     def test_doc_multiple_types_list(self):
         """doc([Type1, Type2]) flattens and documents both."""
         result = doc([SimpleA, SimpleB])
