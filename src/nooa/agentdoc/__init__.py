@@ -42,6 +42,8 @@ from nooa.agentdoc.core import doc
 from nooa.agentdoc.doc_config import DocConfig
 
 __submodules__ = ["ext", "introspect", "visibility", "adapters"]
+# Keep doc(agentdoc) as a capability map; individual callables provide details on demand.
+__agentdoc_concise_members__ = True
 
 
 def truncating_pformat(

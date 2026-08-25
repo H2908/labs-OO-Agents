@@ -213,7 +213,14 @@ def _pformat(
                 from nooa.agentdoc._structured import extract_module_info
 
                 module_info = extract_module_info(_object)
-            _stream.write(_format_module_info(module_info, concise=concise, indent=_indent))
+            _stream.write(
+                _format_module_info(
+                    module_info,
+                    concise=concise,
+                    concise_members=bool(getattr(_object, "__agentdoc_concise_members__", False)),
+                    indent=_indent,
+                )
+            )
         case _ if inspect.isfunction(_object) or inspect.ismethod(_object):
             from nooa.agentdoc._structured import extract_callable_info
 
@@ -841,12 +848,19 @@ def _format_callable_info(
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).rstrip("\n")
 
 
-def _format_module_info(info: ModuleInfo, *, concise: bool, indent: int) -> str:
+def _format_module_info(
+    info: ModuleInfo,
+    *,
+    concise: bool,
+    concise_members: bool = False,
+    indent: int,
+) -> str:
     """Format ModuleInfo as Python module syntax.
 
     Args:
         info: ModuleInfo to format
-        concise: If True, show first-line docstrings only
+        concise: If True, show only the first line of every docstring
+        concise_members: If True, keep the module docstring but shorten member docs
         indent: Indentation level
 
     Returns:
@@ -913,7 +927,9 @@ def _format_module_info(info: ModuleInfo, *, concise: bool, indent: int) -> str:
                 lines.append("")
                 in_value_run = False
             func = func_map[sym_name]
-            func_lines = _format_callable_info(func, concise=concise, indent=indent)
+            func_lines = _format_callable_info(
+                func, concise=concise or concise_members, indent=indent
+            )
             lines.append(func_lines)
             lines.append("")
         elif sym_name in val_map:
