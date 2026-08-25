@@ -81,18 +81,16 @@ def _resolve_field_type_by_name(type_name: str, context_obj: type | None) -> typ
     return None
 
 
-def _collect_referenced_types_transitive(
+def _collect_referenced_types(
     seed_types: set[type],
+    *,
     exclude: type | None = None,
+    max_depth: int,
 ) -> list[type]:
-    """Collect all referenced types transitively via BFS, deduplicated and sorted.
+    """Collect referenced types with bounded breadth-first traversal.
 
-    Args:
-        seed_types: Initial set of types to start from (already filtered).
-        exclude: Primary type to exclude from results (avoid self-reference).
-
-    Returns:
-        Sorted list of all reachable custom types (no duplicates).
+    ``seed_types`` are the direct references (depth 1). Each subsequent level
+    follows references from the preceding level until ``max_depth`` is reached.
     """
     from nooa.agentdoc._discover import discover_referenced_types
 
@@ -101,15 +99,21 @@ def _collect_referenced_types_transitive(
     # own method signatures (common, e.g. DataFrame methods returning DataFrame) must
     # not list itself under "Referenced Types".
     frontier = {t for t in seed_types if t is not exclude}
-    while frontier:
+    for _ in range(max_depth):
+        if not frontier:
+            break
         all_types.update(frontier)
         next_frontier: set[type] = set()
-        for t in frontier:
-            for new_t in discover_referenced_types(t):
-                if new_t not in all_types and not is_expand_false(new_t) and new_t is not exclude:
-                    next_frontier.add(new_t)
+        for ref_type in frontier:
+            for new_type in discover_referenced_types(ref_type):
+                if (
+                    new_type not in all_types
+                    and not is_expand_false(new_type)
+                    and new_type is not exclude
+                ):
+                    next_frontier.add(new_type)
         frontier = next_frontier
-    return sorted(all_types, key=lambda t: t.__name__)
+    return sorted(all_types, key=lambda type_: type_.__name__)
 
 
 def _field_type_docstring(
@@ -739,8 +743,10 @@ def _format_type_info(
                 if _is_custom_type(extra_type) and not is_expand_false(extra_type):
                     seed_set.add(extra_type)
 
-        # Collect all referenced types transitively (BFS), render flat
-        referenced_types = _collect_referenced_types_transitive(seed_set, exclude=context_obj)
+        # Collect referenced types to the requested depth, then render them flat.
+        referenced_types = _collect_referenced_types(
+            seed_set, exclude=context_obj, max_depth=type_depth
+        )
         if referenced_types:
             lines.append(f"{ind}## Referenced Types")
 
@@ -826,7 +832,9 @@ def _format_callable_info(
         from nooa.agentdoc._structured import extract_type_info
 
         seed_set = {t for t in discover_referenced_types(context_obj) if not is_expand_false(t)}
-        referenced_types = _collect_referenced_types_transitive(seed_set, exclude=context_obj)
+        referenced_types = _collect_referenced_types(
+            seed_set, exclude=context_obj, max_depth=type_depth
+        )
 
         if referenced_types:
             lines.append("")

@@ -188,12 +188,14 @@ class TestTypeDepthParameter:
         assert "## Referenced Types" not in result
 
     def test_inline_depth_one_direct_references(self):
-        """inline_depth=1 shows direct referenced types."""
-        result = doc(Customer, inline_depth=1)
+        """inline_depth=1 includes direct references but not their references."""
+        # Order -> Customer -> Address
+        result = doc(Order, inline_depth=1)
 
-        assert "class Customer" in result
+        assert "class Order" in result
         assert "## Referenced Types" in result
-        assert "class Address" in result
+        assert "class Customer" in result
+        assert "class Address" not in result
 
     def test_inline_depth_two_transitive_references(self):
         """inline_depth=2 shows transitive referenced types."""
@@ -204,6 +206,15 @@ class TestTypeDepthParameter:
         assert "## Referenced Types" in result
         assert "class Customer" in result
         assert "class Address" in result  # Transitive through Customer
+
+    def test_inline_depth_bounds_multi_object_references(self):
+        """Multi-object docs use the same direct-versus-transitive semantics."""
+        direct = doc(Order, SimpleA, inline_depth=1)
+        transitive = doc(Order, SimpleA, inline_depth=2)
+
+        assert "class Customer" in direct
+        assert "class Address" not in direct
+        assert "class Address" in transitive
 
     def test_inline_depth_default_with_concise_false(self):
         """Default inline_depth=1 when concise=False."""
