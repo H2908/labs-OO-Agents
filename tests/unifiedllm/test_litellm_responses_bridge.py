@@ -33,7 +33,7 @@ def _responses_tool_call() -> ResponsesAPIResponse:
     return ResponsesAPIResponse(
         id="resp_123",
         created_at=0,
-        model="gpt-5.4",
+        model="gpt-5.6",
         object="response",
         status="completed",
         output=[
@@ -52,7 +52,7 @@ def _responses_tool_call() -> ResponsesAPIResponse:
 
 def _chat_response() -> ModelResponse:
     return ModelResponse(
-        model="gpt-5.4",
+        model="gpt-5.6",
         choices=[
             Choices(
                 finish_reason="stop",
@@ -62,13 +62,14 @@ def _chat_response() -> ModelResponse:
     )
 
 
-def _client(**config: object) -> CompletionClient:
-    return CompletionClient(model="openai/gpt-5.4", api_key="test", **config)
+def _client(model: str = "openai/gpt-5.6", **config: object) -> CompletionClient:
+    return CompletionClient(model=model, api_key="test", **config)
 
 
 @pytest.mark.asyncio
-async def test_default_reasoning_tool_call_uses_responses_bridge() -> None:
-    client = _client()
+@pytest.mark.parametrize("model", ["gpt-5.6", "openai/gpt-5.6"])
+async def test_default_reasoning_tool_call_uses_responses_bridge(model: str) -> None:
+    client = _client(model=model)
     try:
         with (
             patch(
