@@ -216,6 +216,49 @@ class TestCodeActStrategySimpleExecution:
         assert result == 15
 
     @pytest.mark.asyncio
+    async def test_reasoning_items_replayed_with_tool_call_history(self):
+        """Opaque reasoning state is retained for the next CodeAct turn."""
+
+        class TestAgent(Agent, llm=_TEST_LLM):
+            async def compute(self) -> int:
+                """Compute a value."""
+                ...
+
+        reasoning_item = {
+            "id": "rs_123",
+            "type": "reasoning",
+            "encrypted_content": "encrypted-state",
+            "summary": [],
+        }
+        first_response = _resp(
+            "", tool_calls=[_tool_call("value = 42\nprint(value)", call_id="call_reasoning")]
+        )
+        first_response.assistant_message["reasoning_items"] = [reasoning_item]
+        fake_llm = FakeLLMClient(
+            scripted_responses=[
+                first_response,
+                _resp("", tool_calls=[_return_result(result=42)]),
+            ]
+        )
+
+        agent_instance = TestAgent(llm=fake_llm)
+        result = await agent_instance.compute()
+
+        assert result == 42
+        tool_call_event = next(
+            event
+            for event in agent_instance.event_manager.values()
+            if event.event_type == "ToolCallEvent" and event.tool_call_id == "call_reasoning"
+        )
+        assert tool_call_event.reasoning_items == [reasoning_item]
+        replayed_tool_call = next(
+            message
+            for message in fake_llm.last_messages
+            if message.get("role") == "assistant" and message.get("tool_calls")
+        )
+        assert replayed_tool_call["reasoning_items"] == [reasoning_item]
+
+    @pytest.mark.asyncio
     async def test_multiple_tool_calls_then_result(self):
         """LLM calling execute_python multiple times before return_result."""
 
