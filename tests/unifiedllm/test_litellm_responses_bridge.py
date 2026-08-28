@@ -8,7 +8,7 @@ import pytest
 from litellm.types.llms.openai import ResponsesAPIResponse
 from litellm.types.utils import Choices, Message, ModelResponse
 
-from nooa.unifiedllm import CompletionClient, Tool
+from nooa.unifiedllm import MODELS, CompletionClient, Tool, get_llm_client
 
 
 def _execute_python(code: str) -> str:
@@ -63,7 +63,13 @@ def _chat_response() -> ModelResponse:
 
 
 def _client(model: str = "openai/gpt-5.6", **config: object) -> CompletionClient:
-    return CompletionClient(model=model, api_key="test", **config)
+    with (
+        patch("nooa.unifiedllm.registry.ensure_loaded"),
+        patch.dict(MODELS, {}, clear=True),
+    ):
+        client = get_llm_client(model, api_key="test", **config)
+    assert isinstance(client, CompletionClient)
+    return client
 
 
 @pytest.mark.asyncio
