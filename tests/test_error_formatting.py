@@ -11,6 +11,8 @@ Ensures errors shown to the LLM match IPython/Jupyter-style output:
 - Validation errors show clean messages without tracebacks
 """
 
+from pathlib import Path
+
 import pytest
 
 from nooa.errors import IPythonErrorFormatter, RestrictedCodeError, format_error_for_llm
@@ -37,9 +39,17 @@ class TestIsUserCodeFrame:
         assert _is_user_code_frame("<execute_code>") is True
 
     def test_nooa_is_framework(self):
-        """Frames from nooa/ are framework code."""
-        assert _is_user_code_frame("/path/to/nooa/runtime/actor.py") is False
+        """Package-relative and actual NOOA source frames are framework code."""
+        import nooa
+
         assert _is_user_code_frame("nooa/strategies/pure_python.py") is False
+        package_frame = str(Path(nooa.__file__).resolve().parent / "runtime" / "actor.py")
+        assert _is_user_code_frame(package_frame) is False
+
+    def test_user_checkout_named_nooa_is_not_framework(self):
+        """A directory component named nooa must not hide user/helper frames."""
+        assert _is_user_code_frame("/home/user/repos/nooa/helpers/agent.py") is True
+        assert _is_user_code_frame("/tmp/nooa/project/task.py") is True
 
     def test_site_packages_is_framework(self):
         """Frames from site-packages are framework code."""

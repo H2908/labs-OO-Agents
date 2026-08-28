@@ -32,6 +32,7 @@ formatter injection.
 
 import re
 import traceback
+from pathlib import Path, PurePath
 from typing import Protocol
 
 from nooa.agentdoc import TruncatingStringIO
@@ -41,8 +42,11 @@ from nooa.config.truncation_config import DEFAULT_TRUNCATION_CONFIG
 # Traceback selection and IPython normalization policy
 # ---------------------------------------------------------------------------
 
-# Framework path markers - frames containing these are filtered out
-_FRAMEWORK_MARKERS = ("nooa/", "site-packages/", "lib/python", "<frozen")
+# The checked-out/installed NOOA package root. Match it as a path ancestor,
+# never as the bare substring ``"nooa/"``: user repositories may themselves
+# live under a directory named ``nooa``.
+_NOOA_PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+_FRAMEWORK_PATH_PARTS = {"site-packages", "dist-packages"}
 
 # User code filename pattern - matches "Cell In[N]" format
 _CELL_PATTERN = re.compile(r"^Cell In\[\d+\]$")
@@ -229,12 +233,30 @@ def _is_user_code_frame(filename: str) -> bool:
     Returns False for:
     - Framework paths (nooa/, site-packages/, lib/python, etc.)
     """
-    # Filter out framework paths first
-    if any(marker in filename for marker in _FRAMEWORK_MARKERS):
+    if filename.startswith("<frozen"):
         return False
 
-    # Everything else is user code (REPL cells, user's agent files, etc.)
-    return True
+    path = PurePath(filename)
+    parts = path.parts
+    if _FRAMEWORK_PATH_PARTS.intersection(parts):
+        return False
+    if any(
+        part.startswith("python")
+        for index, part in enumerate(parts)
+        if index and parts[index - 1] == "lib"
+    ):
+        return False
+
+    # Relative module paths emitted by some traceback producers are safe to
+    # classify only when ``nooa`` is the first complete component.
+    if not path.is_absolute() and parts and parts[0] == "nooa":
+        return False
+
+    try:
+        Path(filename).resolve().relative_to(_NOOA_PACKAGE_ROOT)
+    except (OSError, ValueError):
+        return True
+    return False
 
 
 def _is_validation_error(error: Exception) -> bool:
