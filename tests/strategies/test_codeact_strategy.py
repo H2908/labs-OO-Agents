@@ -220,7 +220,6 @@ class TestCodeActStrategySimpleExecution:
         """Opaque reasoning state is retained for the next CodeAct turn."""
 
         class TestAgent(Agent, llm=_TEST_LLM):
-            @strategy(CodeActStrategy(config=CodeActConfig()))
             async def compute(self) -> int:
                 """Compute a value."""
                 ...
