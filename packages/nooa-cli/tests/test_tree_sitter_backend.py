@@ -54,3 +54,32 @@ def test_current_tree_sitter_extracts_symbols_and_references(tmp_path: Path):
     assert symbols is not None
     assert any("method target" in symbol for symbol in symbols)
     assert references == [(4, "new Example().target();")]
+
+
+def test_query_captures_normalizes_legacy_mapping_results(monkeypatch):
+    later = SimpleNamespace(start_byte=20)
+    earlier = SimpleNamespace(start_byte=10)
+    query = SimpleNamespace(captures=Mock(return_value={"name": [later, earlier]}))
+    constructor = Mock(side_effect=AssertionError("QueryCursor should not be used"))
+    monkeypatch.setattr(backend, "ts", SimpleNamespace(QueryCursor=constructor), raising=False)
+
+    assert backend._query_captures(query, object()) == [
+        (earlier, "name"),
+        (later, "name"),
+    ]
+    constructor.assert_not_called()
+
+
+def test_typescript_definition_query_compiles_with_installed_grammar(tmp_path: Path):
+    if not backend.TREE_SITTER_AVAILABLE:
+        pytest.skip("Tree-sitter AST extra is not installed")
+    if backend._get_parser("typescript") is None:
+        pytest.skip("TypeScript Tree-sitter grammar is not installed")
+
+    source = tmp_path / "sample.ts"
+    source.write_text("class Example {}\n")
+
+    symbols = backend.ts_extract_symbols(source, "typescript")
+
+    assert symbols is not None
+    assert any("class Example" in symbol for symbol in symbols)

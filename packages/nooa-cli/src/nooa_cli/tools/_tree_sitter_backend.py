@@ -58,7 +58,7 @@ _DEFINITION_QUERIES = {
     """,
     "typescript": """
         (function_declaration name: (identifier) @name) @def
-        (class_declaration name: (identifier) @name) @def
+        (class_declaration name: (type_identifier) @name) @def
         (interface_declaration name: (type_identifier) @name) @def
         (type_alias_declaration name: (type_identifier) @name) @def
         (method_definition name: (property_identifier) @name) @def
@@ -147,18 +147,21 @@ def _compile_query(language: ts.Language, source: str) -> ts.Query:
     return ts.Query(language, source)
 
 
-def _query_captures(query: ts.Query, root_node: ts.Node) -> list[tuple[ts.Node, str]]:
-    legacy_captures = getattr(query, "captures", None)
-    if legacy_captures is not None:
-        return legacy_captures(root_node)
-
-    captures = ts.QueryCursor(query).captures(root_node)
+def _normalize_captures(captures) -> list[tuple[ts.Node, str]]:
+    """Normalize capture results returned by different Tree-sitter releases."""
     if isinstance(captures, dict):
-        flattened = [
+        captures = [
             (node, capture_name) for capture_name, nodes in captures.items() for node in nodes
         ]
-        return sorted(flattened, key=lambda item: item[0].start_byte)
+        return sorted(captures, key=lambda item: item[0].start_byte)
     return captures
+
+
+def _query_captures(query: ts.Query, root_node: ts.Node) -> list[tuple[ts.Node, str]]:
+    legacy_captures = getattr(query, "captures", None)
+    if callable(legacy_captures):
+        return _normalize_captures(legacy_captures(root_node))
+    return _normalize_captures(ts.QueryCursor(query).captures(root_node))
 
 
 def ts_extract_symbols(path: Path, lang: str, max_symbols: int = 200) -> list[str] | None:
